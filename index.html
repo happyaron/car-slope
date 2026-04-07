@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Can my car make it over this slope?</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header>
+  <h1>Can my car make it over this slope?</h1>
+  <p>Enter your car's geometry and the ramp profile to check all four critical clearance points.</p>
+</header>
+
+<div class="presets">
+  <span>Presets:</span>
+  <button onclick="loadPreset('m3p_easy')">Model 3 Perf + 15% ramp (easy)</button>
+  <button onclick="loadPreset('m3p_hard')">Model 3 Perf + 20% ramp (hard)</button>
+  <button onclick="loadPreset('sports')">Generic sports car + 18% ramp</button>
+</div>
+
+<div class="main">
+  <aside class="sidebar">
+    <fieldset>
+      <legend>Car geometry</legend>
+
+      <div class="field">
+        <label>Wheelbase<small>front axle → rear axle</small></label>
+        <input type="number" id="wheelbase" value="2875" min="1000" max="5000" step="5" />
+        <span class="unit">mm</span>
+      </div>
+      <div class="field">
+        <label>Ground clearance<small>lowest chassis point</small></label>
+        <input type="number" id="clearance" value="138" min="50" max="500" step="1" />
+        <span class="unit">mm</span>
+      </div>
+      <div class="field">
+        <label>Front overhang<small>front axle → front bumper</small></label>
+        <input type="number" id="frontOverhang" value="840" min="100" max="2000" step="5" />
+        <span class="unit">mm</span>
+      </div>
+      <div class="field">
+        <label>Rear overhang<small>rear axle → rear bumper</small></label>
+        <input type="number" id="rearOverhang" value="978" min="100" max="2000" step="5" />
+        <span class="unit">mm</span>
+      </div>
+      <div class="field">
+        <label>Approach angle<small>front bumper clearance angle</small></label>
+        <input type="number" id="approachAngle" value="15" min="1" max="45" step="0.5" />
+        <span class="unit">°</span>
+      </div>
+      <div class="field">
+        <label>Departure angle<small>rear bumper clearance angle</small></label>
+        <input type="number" id="departureAngle" value="16" min="1" max="45" step="0.5" />
+        <span class="unit">°</span>
+      </div>
+      <div class="field">
+        <label>Breakover angle<small>belly clearance over a crest</small></label>
+        <input type="number" id="breakoverAngle" value="12" min="1" max="30" step="0.5" />
+        <span class="unit">°</span>
+      </div>
+      <div class="field">
+        <label>Tire radius<small>wheel outer radius</small></label>
+        <input type="number" id="tireRadius" value="340" min="200" max="600" step="5" />
+        <span class="unit">mm</span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Slope / ramp</legend>
+
+      <div class="field">
+        <label>Ramp angle</label>
+        <input type="number" id="rampAngle" value="8.53" min="1" max="30" step="0.1" />
+        <span class="unit">°</span>
+      </div>
+      <div class="field">
+        <label>Ramp grade (auto-calculates angle)</label>
+        <input type="number" id="rampGrade" value="15" min="1" max="50" step="0.5" />
+        <span class="unit">%</span>
+      </div>
+      <div class="field">
+        <label>Ramp length<small>along the slope surface</small></label>
+        <input type="number" id="rampLength" value="20000" min="2000" max="50000" step="500" />
+        <span class="unit">mm</span>
+      </div>
+      <div class="field">
+        <label>Upper flat length<small>before the ramp starts</small></label>
+        <input type="number" id="upperFlat" value="3000" min="500" max="10000" step="500" />
+        <span class="unit">mm</span>
+      </div>
+      <div class="field">
+        <label>Lower flat length<small>after the ramp ends</small></label>
+        <input type="number" id="lowerFlat" value="3000" min="500" max="10000" step="500" />
+        <span class="unit">mm</span>
+      </div>
+    </fieldset>
+  </aside>
+
+  <div class="right-panel">
+    <div id="canvas-wrap">
+      <canvas id="scene" width="900" height="420"></canvas>
+    </div>
+    <div id="results">
+      <span class="verdict" id="verdict">—</span>
+      <span class="check-item" id="chk-approach">Approach</span>
+      <span class="check-item" id="chk-breakover-top">Top breakover</span>
+      <span class="check-item" id="chk-breakover-bot">Bottom belly</span>
+      <span class="check-item" id="chk-departure">Departure</span>
+      <span class="slope-annotation" id="slope-info"></span>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
