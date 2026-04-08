@@ -35,7 +35,7 @@ Each check reports a signed clearance in millimetres. If any gap is negative, th
 
 The car's underside is modeled as a 5-point polyline in car-local coordinates (origin at front tire contact, +x forward):
 
-```
+```text
   Front bumper ─── Approach ramp ─── Belly (flat) ─── Departure ramp ─── Rear bumper
 ```
 
@@ -55,7 +55,7 @@ The approach and departure angles determine how steeply the underside rises from
 
 A 3-segment polyline:
 
-```
+```text
   Upper flat ──► Ramp (slope) ──► Lower flat
                  ▲ crest            ▼ bottom
 ```
@@ -64,7 +64,7 @@ A 3-segment polyline:
 
 A 5-segment polyline:
 
-```
+```text
   Upper flat ──► Rise ──► Flat top ──► Fall ──► Lower flat
 ```
 
@@ -84,12 +84,14 @@ The slope angle can be entered in degrees or as a percentage grade (e.g. 15% ≈
 
 No road length inputs are exposed. All lengths are auto-computed from the car geometry:
 
-- **Upper flat**: `wheelbase + 2 m` — long enough that the rear tire starts well clear of the obstacle
+- **Upper flat** (ramp): `wheelbase + 3 m` — long enough that the vehicle approaches from a settled flat section
 - **Lower flat** (ramp): `wheelbase + rear overhang + 2 m` — long enough that the rear bumper fully exits
-- **Lower flat** (bump): same formula, referenced from the fall base
+- **Upper flat start** (bump): fixed at `x = -6000`, which gives bump mode a longer approach road before the rise
+- **Rise base** (bump): fixed at `x = 1800`, where the flat road ends and the bump starts climbing
+- **Lower flat** (bump): `wheelbase + rear overhang + 3.8 m` after the fall, giving a longer runout after the bump
 - **Ramp length**: `max(2 × wheelbase, 8 m) / cos(θ)` — along the slope surface
 
-These lengths are purely visual (they position the road ends on canvas). The clearance math depends only on obstacle angles and heights, not on how long the flat sections are.
+These lengths are visual layout controls. They set where the road begins and ends on the canvas and where the bump sits within that road, but the clearance math still depends on the obstacle angles and heights rather than arbitrary road-end positions.
 
 ## How clearance is computed
 
@@ -117,21 +119,21 @@ The results bar at the bottom shows a verdict (PASS / PASS-but-tight / FAIL) and
 
 ## Presets
 
-Five built-in configurations:
+Four built-in configurations:
 
 **Ramp mode:**
-- **Model 3 Perf + 15% ramp** — a common EV with modest ground clearance on a typical driveway
-- **Model 3 Perf + 20% ramp** — steeper scenario, breakover clearance gets tight
-- **Sports car + 18% ramp** — lower clearance, shorter wheelbase
+- **Sports car + 15% ramp** — moderate geometry on a typical driveway
+- **Sports car + 20% ramp** — steeper scenario, breakover clearance gets tighter
 
 **Bump mode:**
-- **Model 3 Perf + 100mm bump** — 100mm speed bump at 20% grade (symmetric)
-- **Model 3 Perf + 150mm bump** — 150mm speed bump at 20% grade (symmetric)
+- **Sports car + 100 mm bump** — moderate bump height with symmetric 20% faces
+- **Sports car + 150 mm bump** — taller bump with symmetric 20% faces
 
 ## Design notes
 
 - Pure vanilla HTML/CSS/JS — no frameworks, no build step, no dependencies.
 - Canvas bounding box tracks the road's left edge with a fixed 500 mm margin, then extends a fixed total width. This keeps the car rendered at the same scale regardless of obstacle type or car size.
+- Bump mode uses explicit span controls (`upperFlatStart`, `riseBase`, `lowerFlatLen`) to place the bump within a longer stretch of flat road without changing the fixed viewport logic.
 - Re-renders live on any input change.
 - The worst-case scenario is drawn solid; others are dashed ghosts for comparison.
 - Slope angle and grade percentage stay bidirectionally synced, independently for rise and fall.
