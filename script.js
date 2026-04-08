@@ -497,7 +497,8 @@ const canvas = document.getElementById('scene');
 const ctx = canvas.getContext('2d');
 
 function render(c, results) {
-  const W = canvas.width, H = canvas.height;
+  const W = parseFloat(canvas.style.width) || canvas.width;
+  const H = parseFloat(canvas.style.height) || canvas.height;
   ctx.clearRect(0, 0, W, H);
 
   const road = buildRoad(c);
@@ -1042,8 +1043,14 @@ let canvasSized = false;
 function sizeCanvas() {
   if (canvasSized) return;
   const wrap = document.getElementById('canvas-wrap');
-  canvas.width = Math.max(600, wrap.clientWidth - 32);
-  canvas.height = Math.max(300, wrap.clientHeight - 32);
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = Math.max(600, wrap.clientWidth - 32);
+  const cssH = Math.max(300, wrap.clientHeight - 32);
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  ctx.scale(dpr, dpr);
   canvasSized = true;
 }
 
