@@ -15,9 +15,11 @@
 
 <div class="presets">
   <span>Presets:</span>
-  <button onclick="loadPreset('m3p_easy')">Model 3 Perf + 15% ramp (easy)</button>
-  <button onclick="loadPreset('m3p_hard')">Model 3 Perf + 20% ramp (hard)</button>
-  <button onclick="loadPreset('sports')">Generic sports car + 18% ramp</button>
+  <button onclick="loadPreset('m3p_easy')">Model 3 Perf + 15% ramp</button>
+  <button onclick="loadPreset('m3p_hard')">Model 3 Perf + 20% ramp</button>
+  <button onclick="loadPreset('sports')">Sports car + 18% ramp</button>
+  <button onclick="loadPreset('m3p_bump100')">Model 3 Perf + 100mm bump</button>
+  <button onclick="loadPreset('m3p_bump150')">Model 3 Perf + 150mm bump</button>
 </div>
 
 <div class="main">
@@ -70,29 +72,53 @@
     <fieldset>
       <legend>Slope / ramp</legend>
 
+      <div class="field mode-toggle">
+        <label>Mode</label>
+        <span class="toggle-group">
+          <input type="radio" name="mode" id="modeRamp" value="ramp" checked />
+          <label for="modeRamp">Ramp</label>
+          <input type="radio" name="mode" id="modeBump" value="bump" />
+          <label for="modeBump">Bump</label>
+        </span>
+      </div>
       <div class="field">
-        <label>Ramp angle</label>
+        <label>Slope angle</label>
         <input type="number" id="rampAngle" value="8.53" min="1" max="30" step="0.1" />
         <span class="unit">°</span>
       </div>
       <div class="field">
-        <label>Ramp grade (auto-calculates angle)</label>
+        <label>Slope grade (auto-calculates angle)</label>
         <input type="number" id="rampGrade" value="15" min="1" max="50" step="0.5" />
         <span class="unit">%</span>
       </div>
-      <div class="field">
+      <div class="field ramp-only">
         <label>Ramp length<small>along the slope surface</small></label>
         <input type="number" id="rampLength" value="20000" min="2000" max="50000" step="500" />
         <span class="unit">mm</span>
       </div>
       <div class="field">
-        <label>Upper flat length<small>before the ramp starts</small></label>
+        <label>Upper flat length<small>before the obstacle</small></label>
         <input type="number" id="upperFlat" value="3000" min="500" max="10000" step="500" />
         <span class="unit">mm</span>
       </div>
-      <div class="field">
+      <div class="field ramp-only">
         <label>Lower flat length<small>after the ramp ends</small></label>
         <input type="number" id="lowerFlat" value="3000" min="500" max="10000" step="500" />
+        <span class="unit">mm</span>
+      </div>
+      <div class="field bump-only" style="display:none">
+        <label>Bump height<small>peak height above ground</small></label>
+        <input type="number" id="bumpHeight" value="100" min="20" max="500" step="5" />
+        <span class="unit">mm</span>
+      </div>
+      <div class="field bump-only" style="display:none">
+        <label>Bump width<small>flat top width</small></label>
+        <input type="number" id="bumpWidth" value="1000" min="100" max="5000" step="50" />
+        <span class="unit">mm</span>
+      </div>
+      <div class="field bump-only" style="display:none">
+        <label>Lower flat length<small>after the bump</small></label>
+        <input type="number" id="lowerFlatBump" value="3000" min="500" max="10000" step="500" />
         <span class="unit">mm</span>
       </div>
     </fieldset>

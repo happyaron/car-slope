@@ -94,6 +94,29 @@ legend {
 }
 .field .unit { font-size: .78rem; color: #666; width: 28px; text-align: left; }
 
+.mode-toggle .toggle-group {
+  display: flex;
+  gap: 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.mode-toggle .toggle-group input[type=radio] { display: none; }
+.mode-toggle .toggle-group label {
+  font-size: .82rem;
+  padding: .3rem .75rem;
+  cursor: pointer;
+  background: #f0f0f0;
+  color: #555;
+  border-right: 1px solid #ccc;
+  user-select: none;
+}
+.mode-toggle .toggle-group label:last-of-type { border-right: none; }
+.mode-toggle .toggle-group input[type=radio]:checked + label {
+  background: #4a90d9;
+  color: #fff;
+}
+
 .right-panel {
   display: flex;
   flex-direction: column;
