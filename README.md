@@ -138,6 +138,17 @@ Five built-in configurations:
 - Asymmetric bump: rise and fall faces each have their own angle; symmetric is the default (fall defaults to rise).
 - Units are millimetres and degrees throughout (automotive standard).
 
+## Why ramp and bump are separate modes
+
+The two modes are topologically different obstacles:
+
+- **Ramp** — net height change. The road descends from one level to another permanently.
+- **Bump** — closed loop. The road rises and returns to the original level.
+
+The road geometry, scenario positioning, and clearance math all differ as a result. The four clearance checks test the car at the same conceptual positions (approach, top breakover, bottom breakover, departure), but the exact axle placement for each check depends on the obstacle topology — ramp has one top and one bottom transition; bump has four (rise base, rise top, fall top, fall base).
+
+A general segment-list road model could unify `buildRoad()` and the canvas drawing loop, but scenario positioning would still need separate logic per obstacle type. The current explicit branching keeps each mode self-contained and easy to reason about without adding a more abstract framework.
+
 ## Running it
 
 Open `index.html` in any modern browser. No server needed.
