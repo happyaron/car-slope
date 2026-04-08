@@ -696,13 +696,21 @@ function render(c, results) {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Descriptive label near each ghost car
-      const [fx, fy] = pts[0];
+      // Descriptive label near each ghost car — adjusted to avoid collisions:
+      //   S1 when S2 is also a ghost (worst=S3/S4): nudge left ~44px so it
+      //     doesn't crowd "belly clears top crest" which sits just to its right.
+      //   S2: fixed -28px vertical offset to clear the solid car's REAR label.
+      //   S3 when S4 is also a ghost (worst=S1/S2): anchor at rear bumper so the
+      //     label lands near the ramp top, away from S4's lower-flat label.
+      const anchorPt = (si === 2 && worstIdx <= 1) ? pts[pts.length - 1] : pts[0];
+      const [fx, fy] = anchorPt;
+      const xNudge = (si === 0 && worstIdx >= 2) ? -44 : 0;
+      const yOff = si === 1 ? -28 : -10;
       ctx.globalAlpha = 0.4;
       ctx.fillStyle = color;
       ctx.font = 'italic 10px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText(descLabels[si], tx(fx), ty(fy) - 10);
+      ctx.fillText(descLabels[si], tx(fx) + xNudge, ty(fy) + yOff);
       ctx.restore();
       continue;
     }
