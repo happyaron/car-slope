@@ -531,12 +531,16 @@ function render(c, results) {
   ctx.fillStyle = '#f0f4ff';
   ctx.fillRect(0, 0, W, H);
 
+  // Extend the road 2000 mm to the left visually — gives the travel direction
+  // arrow natural breathing room without affecting car positions or the bounding box.
+  const roadDrawX0 = road[0][0] - 1200;
+
   // Ground fill
   ctx.beginPath();
-  ctx.moveTo(tx(road[0][0]), ty(road[0][1]));
+  ctx.moveTo(tx(roadDrawX0), ty(road[0][1]));
   for (const [x, y] of road) ctx.lineTo(tx(x), ty(y));
   ctx.lineTo(tx(road[road.length - 1][0]), ty(by1));
-  ctx.lineTo(tx(road[0][0]), ty(by1));
+  ctx.lineTo(tx(roadDrawX0), ty(by1));
   ctx.closePath();
   ctx.fillStyle = '#c8d8b0';
   ctx.fill();
@@ -555,7 +559,7 @@ function render(c, results) {
 
   // Road surface line
   ctx.beginPath();
-  ctx.moveTo(tx(road[0][0]), ty(road[0][1]));
+  ctx.moveTo(tx(roadDrawX0), ty(road[0][1]));
   for (const [x, y] of road) ctx.lineTo(tx(x), ty(y));
   ctx.strokeStyle = '#555';
   ctx.lineWidth = 2.5;
