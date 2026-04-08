@@ -514,7 +514,7 @@ function render(c, results) {
   const BOX_W = 26500; // fixed world width — determines car scale
   const bx1 = road[0][0] - 500; // 500mm margin to the left of road start
   const bx2 = bx1 + BOX_W;
-  const by1 = bumpMode ? -1500 : -6500;
+  const by1 = -6500;
   const by2 = 1200;
 
   const PAD = 90;
