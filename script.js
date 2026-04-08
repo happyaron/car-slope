@@ -9,31 +9,31 @@ const PRESETS = {
     mode: 'ramp',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
     approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
-    rampGrade: 15, rampLength: 20000, upperFlat: 3000, lowerFlat: 3000,
+    rampGrade: 15,
   },
   m3p_hard: {
     mode: 'ramp',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
     approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
-    rampGrade: 20, rampLength: 20000, upperFlat: 3000, lowerFlat: 3000,
+    rampGrade: 20,
   },
   sports: {
     mode: 'ramp',
     wheelbase: 2450, clearance: 110, frontOverhang: 900, rearOverhang: 750,
     approachAngle: 12, departureAngle: 14, breakoverAngle: 10, tireRadius: 320,
-    rampGrade: 18, rampLength: 15000, upperFlat: 3000, lowerFlat: 3000,
+    rampGrade: 18,
   },
   m3p_bump100: {
     mode: 'bump',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
     approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
-    rampGrade: 20, upperFlat: 6000, bumpHeight: 100, bumpWidth: 1000, lowerFlatBump: 6000,
+    rampGrade: 20, rampGradeFall: 20, bumpHeight: 100, bumpWidth: 1000,
   },
   m3p_bump150: {
     mode: 'bump',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
     approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
-    rampGrade: 20, upperFlat: 6000, bumpHeight: 150, bumpWidth: 1000, lowerFlatBump: 6000,
+    rampGrade: 20, rampGradeFall: 20, bumpHeight: 150, bumpWidth: 1000,
   },
 };
 
@@ -51,6 +51,9 @@ function loadPreset(key) {
       if (id === 'rampGrade') {
         document.getElementById('rampAngle').value = gradeToDeg(val).toFixed(2);
       }
+      if (id === 'rampGradeFall') {
+        document.getElementById('rampAngleFall').value = gradeToDeg(val).toFixed(2);
+      }
     }
   }
   update();
@@ -60,6 +63,15 @@ function syncModeUI() {
   const bump = document.getElementById('modeBump').checked;
   document.querySelectorAll('.ramp-only').forEach(el => el.style.display = bump ? 'none' : '');
   document.querySelectorAll('.bump-only').forEach(el => el.style.display = bump ? '' : 'none');
+  if (bump) {
+    // Default fall angle = rise angle for symmetric bump when switching modes
+    const riseAngle = document.getElementById('rampAngle').value;
+    const riseGrade = document.getElementById('rampGrade').value;
+    if (!document.getElementById('rampAngleFall').value || document.getElementById('rampAngleFall').value === '0') {
+      document.getElementById('rampAngleFall').value = riseAngle;
+      document.getElementById('rampGradeFall').value = riseGrade;
+    }
+  }
 }
 
 // ─── Unit helpers ─────────────────────────────────────────────────────────────
@@ -82,16 +94,21 @@ function readInputs() {
     αb:  v('breakoverAngle'),
     r:   v('tireRadius'),
     θ:   v('rampAngle'),
-    Uf:  v('upperFlat'),
     mode,
   };
+  // Lengths are auto-computed from car geometry — they only affect canvas display,
+  // not any clearance calculation (all length terms cancel in the perp-distance algebra).
+  base.Uf = base.L + 2000;            // flat before obstacle: wheelbase + 2m margin
+  base.Lf = base.L + base.Or + 2000;  // flat after obstacle: wheelbase + rear overhang + 2m
+
   if (mode === 'bump') {
     base.bH = v('bumpHeight');
     base.bW = v('bumpWidth');
-    base.Lf = v('lowerFlatBump');
+    const fallAngle = v('rampAngleFall');
+    base.θf = fallAngle > 0 ? fallAngle : base.θ; // fall angle, defaults to rise angle (symmetric)
   } else {
-    base.Lr = v('rampLength');
-    base.Lf = v('lowerFlat');
+    // Ramp length: at least 8m horizontal run or 2× wheelbase, expressed along slope
+    base.Lr = Math.max(base.L * 2, 8000) / Math.cos(deg2rad(base.θ));
   }
   return base;
 }
@@ -133,16 +150,17 @@ function bumpOx(c) { return -3000 + c.Uf; }
 
 function buildRoad(c) {
   if (c.mode === 'bump') {
-    const { θ, bH, bW, Uf, Lf } = c;
-    const rX = bH / Math.tan(deg2rad(θ));
+    const { θ, θf, bH, bW, Lf } = c;
+    const rXrise = bH / Math.tan(deg2rad(θ));
+    const rXfall = bH / Math.tan(deg2rad(θf));
     const ox = bumpOx(c);
     return [
-      [-3000, 0],                          // upper flat (shifted)
-      [ox, 0],                             // base of rise
-      [ox + rX, bH],                       // front edge of bump top
-      [ox + rX + bW, bH],                  // rear edge of bump top
-      [ox + rX + bW + rX, 0],              // back to ground level
-      [ox + rX + bW + rX + Lf, 0],         // lower flat
+      [-3000, 0],                                    // upper flat (shifted)
+      [ox, 0],                                       // base of rise
+      [ox + rXrise, bH],                             // front edge of bump top
+      [ox + rXrise + bW, bH],                        // rear edge of bump top
+      [ox + rXrise + bW + rXfall, 0],                // back to ground level
+      [ox + rXrise + bW + rXfall + Lf, 0],           // lower flat
     ];
   }
   const { θ, Lr, Uf, Lf } = c;
@@ -297,22 +315,30 @@ function checkBreakoverTop(c) {
 
 function checkBreakoverBottom(c) {
   if (c.mode === 'bump') {
-    // Front tire at fall base (fallX, 0), rear tire on upper flat.
+    // Front tire at fall base (fallEnd, 0), rear tire on upper flat.
     // Both tires at y=0, car horizontal, bump rises between them.
-    const { L, θ, bH, bW } = c;
-    const rX = bH / Math.tan(deg2rad(θ));
+    const { L, θ, θf, bH, bW } = c;
+    const rXrise = bH / Math.tan(deg2rad(θ));
+    const rXfall = bH / Math.tan(deg2rad(θf));
     const ox = bumpOx(c);
     const riseBase = ox;
-    const riseEnd = riseBase + rX;
-    const fallX = riseEnd + bW;
+    const riseEnd = riseBase + rXrise;
+    const fallTopX = riseEnd + bW;
+    const fallEnd = fallTopX + rXfall;
     const profile = buildCarProfile(c);
-    const world = carToWorld(profile, fallX, 0, 0);
+    const world = carToWorld(profile, fallEnd, 0, 0);
     let minGap = Infinity, carPt = null, roadPt = null;
     for (const [x, y] of world) {
-      if (x >= riseEnd && x <= fallX) {
+      if (x >= riseEnd && x <= fallTopX) {
         const gap = y - bH;
         if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = [x, bH]; }
-      } else if (x > fallX) {
+      } else if (x > fallTopX && x <= fallEnd) {
+        // fall face: perpendicular distance to descent from (fallTopX, bH)
+        const dx = x - fallTopX, dy = y - bH;
+        const gap = perpToRamp(dx, dy, θf);
+        const rp = closestOnRamp(dx, dy, θf);
+        if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = [rp[0] + fallTopX, rp[1] + bH]; }
+      } else if (x > fallEnd) {
         if (y < minGap) { minGap = y; carPt = [x, y]; roadPt = [x, 0]; }
       } else if (x >= riseBase && x < riseEnd) {
         const dx = x - riseBase;
@@ -347,25 +373,33 @@ function checkBreakoverBottom(c) {
 
 function checkDeparture(c) {
   if (c.mode === 'bump') {
-    // Rear tire at fall base, car on lower flat. Car angle = 0.
-    const { L, θ, bH, bW } = c;
-    const rX = bH / Math.tan(deg2rad(θ));
+    // Rear tire at fall base (fallEnd, 0), car on lower flat. Car angle = 0.
+    const { L, θ, θf, bH, bW } = c;
+    const rXrise = bH / Math.tan(deg2rad(θ));
+    const rXfall = bH / Math.tan(deg2rad(θf));
     const ox = bumpOx(c);
     const riseBase = ox;
-    const riseEnd = riseBase + rX;
-    const fallX = riseEnd + bW;
+    const riseEnd = riseBase + rXrise;
+    const fallTopX = riseEnd + bW;
+    const fallEnd = fallTopX + rXfall;
     const profile = buildCarProfile(c);
-    const world = carToWorld(profile, fallX + L, 0, 0);
+    const world = carToWorld(profile, fallEnd + L, 0, 0);
     let minGap = Infinity, carPt = null, roadPt = null;
     for (const [x, y] of world) {
-      if (x >= riseBase && x < riseEnd) {
+      if (x > fallTopX && x <= fallEnd) {
+        // fall face: perpendicular distance to descent from (fallTopX, bH)
+        const dx = x - fallTopX, dy = y - bH;
+        const gap = perpToRamp(dx, dy, θf);
+        const rp = closestOnRamp(dx, dy, θf);
+        if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = [rp[0] + fallTopX, rp[1] + bH]; }
+      } else if (x >= riseEnd && x <= fallTopX) {
+        const gap = y - bH;
+        if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = [x, bH]; }
+      } else if (x >= riseBase && x < riseEnd) {
         const dx = x - riseBase;
         const gap = perpToRise(dx, y, θ);
         const rp = closestOnRise(dx, y, θ);
         if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = [rp[0] + riseBase, rp[1]]; }
-      } else if (x >= riseEnd && x <= fallX) {
-        const gap = y - bH;
-        if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = [x, bH]; }
       } else {
         if (y < minGap) { minGap = y; carPt = [x, y]; roadPt = [x, 0]; }
       }
@@ -409,11 +443,12 @@ function buildScenarios(c) {
   const profile = buildCarProfile(c);
 
   if (c.mode === 'bump') {
-    const { bH, bW } = c;
-    const rX = bH / Math.tan(θr);
+    const { bH, bW, θf } = c;
+    const rXrise = bH / Math.tan(θr);
+    const rXfall = bH / Math.tan(deg2rad(θf));
     const ox = bumpOx(c);
     const riseBase = ox;
-    const fallX = ox + rX + bW;
+    const fallEnd = ox + rXrise + bW + rXfall; // bottom of fall face (road[4])
 
     // S1: approach. Front tire at rise base, angle 0.
     const s1 = carToWorld(profile, riseBase, 0, 0);
@@ -423,13 +458,13 @@ function buildScenarios(c) {
     const fa2 = [riseBase + L * Math.cos(θr), L * Math.sin(θr)], ra2 = [riseBase, 0];
     const s2 = carToWorld(profile, fa2[0], fa2[1], θr);
 
-    // S3: bottom breakover. Front tire at fall base, rear tire on upper flat.
-    const s3 = carToWorld(profile, fallX, 0, 0);
-    const fa3 = [fallX, 0], ra3 = [fallX - L, 0];
+    // S3: bottom breakover. Front tire at fall base (fallEnd), rear tire on upper flat.
+    const s3 = carToWorld(profile, fallEnd, 0, 0);
+    const fa3 = [fallEnd, 0], ra3 = [fallEnd - L, 0];
 
-    // S4: departure. Rear tire at fall base, front ahead, angle 0.
-    const s4 = carToWorld(profile, fallX + L, 0, 0);
-    const fa4 = [fallX + L, 0], ra4 = [fallX, 0];
+    // S4: departure. Rear tire at fall base (fallEnd), front ahead, angle 0.
+    const s4 = carToWorld(profile, fallEnd + L, 0, 0);
+    const fa4 = [fallEnd + L, 0], ra4 = [fallEnd, 0];
 
     return [
       { pts: s1, fa: fa1, ra: ra1 },
@@ -477,11 +512,12 @@ function render(c, results) {
   const gaps = scenarioKeys.map(k => results[k].gap);
   const worstIdx = gaps.indexOf(Math.min(...gaps));
 
-  // Stable bounding box: same width for both modes so the car renders at the same scale.
-  // Bump mode shifts the road left edge to bx1 by reducing upperFlat offset.
+  // Bounding box: left edge tracks road start with a fixed margin; total width is
+  // constant across modes so the car renders at the same scale in both.
   const bumpMode = c.mode === 'bump';
-  const bx1 = -3000;
-  const bx2 = bumpMode ? 23500 : 23500;
+  const BOX_W = 26500; // fixed world width — determines car scale
+  const bx1 = road[0][0] - 500; // 500mm margin to the left of road start
+  const bx2 = bx1 + BOX_W;
   const by1 = bumpMode ? -1500 : -6500;
   const by2 = 1200;
 
@@ -555,57 +591,80 @@ function render(c, results) {
     drawHatch(road[1][0], road[1][1], road[2][0], road[2][1]);
   }
 
-  // Grade annotation — arc at the transition point
+  // Grade annotation — arc at the transition point(s)
   {
-    const [x0, y0] = c.mode === 'bump' ? road[1] : road[1];
     const arcR = 60;
-    const grade = degToGrade(c.θ);
     ctx.save();
     ctx.strokeStyle = '#666';
     ctx.lineWidth = 1.5;
+    ctx.fillStyle = '#333';
+    ctx.font = '12px system-ui';
+
     if (c.mode === 'bump') {
-      // Arc goes upward from horizontal
+      // Rise arc at road[1] — upward from horizontal (counterclockwise)
+      const [rx0, ry0] = road[1];
       ctx.beginPath();
-      ctx.arc(tx(x0), ty(y0), arcR, Math.PI, Math.PI - deg2rad(c.θ), true);
+      ctx.arc(tx(rx0), ty(ry0), arcR, Math.PI, Math.PI - deg2rad(c.θ), true);
       ctx.stroke();
+      ctx.textAlign = 'right';
+      ctx.fillText(`${degToGrade(c.θ).toFixed(1)}% rise`, tx(rx0) - arcR - 4, ty(ry0) + 14);
+
+      // Fall arc at road[3] — downward from horizontal (clockwise in screen coords)
+      const [fx0, fy0] = road[3];
+      ctx.beginPath();
+      ctx.arc(tx(fx0), ty(fy0), arcR, 0, deg2rad(c.θf));
+      ctx.stroke();
+      ctx.textAlign = 'left';
+      ctx.fillText(`${degToGrade(c.θf).toFixed(1)}% fall`, tx(fx0) + arcR + 4, ty(fy0) + 14);
     } else {
+      const [x0, y0] = road[1];
       ctx.beginPath();
       ctx.arc(tx(x0), ty(y0), arcR, Math.PI, Math.PI + deg2rad(c.θ));
       ctx.stroke();
+      ctx.textAlign = 'left';
+      ctx.fillText(`${degToGrade(c.θ).toFixed(1)}% grade`, tx(x0) - arcR - 40, ty(y0) + 14);
     }
-    ctx.fillStyle = '#333';
-    ctx.font = '12px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText(`${grade.toFixed(1)}% grade`, tx(x0) - arcR - 40, ty(y0) + 14);
     ctx.restore();
   }
 
   // Length annotation
   {
-    let midX, midY, label;
     if (c.mode === 'bump') {
-      const { θ, bH } = c;
-      const rX = bH / Math.tan(deg2rad(θ));
-      // Show rise face length
-      midX = road[1][0] + rX / 2;
-      midY = road[1][1] + bH / 2;
-      const faceLen = Math.sqrt(rX * rX + bH * bH);
-      label = `L = ${(faceLen / 1000).toFixed(2)} m`;
+      // Place bump dimensions to the right of the fall, below ground line
+      const { θ, θf, bH } = c;
+      const rXrise = bH / Math.tan(deg2rad(θ));
+      const rXfall = bH / Math.tan(deg2rad(θf));
+      const riseFaceLen = Math.sqrt(rXrise * rXrise + bH * bH);
+      const fallFaceLen = Math.sqrt(rXfall * rXfall + bH * bH);
+      const fallEnd = road[4][0];
+      const labelX = fallEnd + 800;
+      ctx.save();
+      ctx.fillStyle = '#555';
+      ctx.font = '11px system-ui';
+      ctx.textAlign = 'left';
+      ctx.fillText(`height = ${(c.bH / 1000).toFixed(2)} m,  width = ${(c.bW / 1000).toFixed(1)} m`, tx(labelX), ty(0) + 20);
+      if (Math.abs(riseFaceLen - fallFaceLen) < 1) {
+        ctx.fillText(`rise = fall length = ${(riseFaceLen / 1000).toFixed(2)} m`, tx(labelX), ty(0) + 36);
+      } else {
+        ctx.fillText(`rise length = ${(riseFaceLen / 1000).toFixed(2)} m`, tx(labelX), ty(0) + 36);
+        ctx.fillText(`fall length = ${(fallFaceLen / 1000).toFixed(2)} m`, tx(labelX), ty(0) + 50);
+      }
+      ctx.restore();
     } else {
-      midX = (road[1][0] + road[2][0]) / 2;
-      midY = (road[1][1] + road[2][1]) / 2;
-      label = `L = ${(c.Lr / 1000).toFixed(1)} m`;
+      const midX = (road[1][0] + road[2][0]) / 2;
+      const midY = (road[1][1] + road[2][1]) / 2;
+      const label = `L = ${(c.Lr / 1000).toFixed(1)} m`;
+      const θr = deg2rad(c.θ);
+      const off = 300;
+      const wx = midX - off * Math.sin(θr);
+      const wy = midY + off * Math.cos(θr);
+      ctx.save();
+      ctx.fillStyle = '#555';
+      ctx.font = '11px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, tx(wx), ty(wy));
+      ctx.restore();
     }
-    const θr = deg2rad(c.θ);
-    const off = 300;
-    const wx = midX - off * Math.sin(θr);
-    const wy = midY + off * Math.cos(θr);
-    ctx.save();
-    ctx.fillStyle = '#555';
-    ctx.font = '11px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText(label, tx(wx), ty(wy));
-    ctx.restore();
   }
 
   // Short names used in left panel and results bar
@@ -744,8 +803,15 @@ function render(c, results) {
 
     // Travel direction arrow along the road
     {
-      const midRoadX = (road[1][0] + road[2][0]) / 2;
-      const midRoadY = (road[1][1] + road[2][1]) / 2;
+      let midRoadX, midRoadY;
+      if (c.mode === 'bump') {
+        // Place arrow on the lower flat, well past the fall — clear of all bump geometry
+        midRoadX = road[4][0] + 400;
+        midRoadY = 0;
+      } else {
+        midRoadX = (road[1][0] + road[2][0]) / 2;
+        midRoadY = (road[1][1] + road[2][1]) / 2;
+      }
       const arrowY = ty(midRoadY) - 30;
       const arrowX1 = tx(midRoadX) - 35;
       const arrowX2 = tx(midRoadX) + 35;
@@ -960,8 +1026,19 @@ document.getElementById('rampGrade').addEventListener('input', e => {
   update();
 });
 
+// ─── Sync fall angle ↔ fall grade ────────────────────────────────────────────
+document.getElementById('rampAngleFall').addEventListener('input', e => {
+  document.getElementById('rampGradeFall').value = degToGrade(parseFloat(e.target.value) || 0).toFixed(1);
+  update();
+});
+document.getElementById('rampGradeFall').addEventListener('input', e => {
+  document.getElementById('rampAngleFall').value = gradeToDeg(parseFloat(e.target.value) || 0).toFixed(2);
+  update();
+});
+
 document.querySelectorAll('input[type=number]').forEach(el => {
-  if (el.id !== 'rampAngle' && el.id !== 'rampGrade') el.addEventListener('input', update);
+  if (!['rampAngle', 'rampGrade', 'rampAngleFall', 'rampGradeFall'].includes(el.id))
+    el.addEventListener('input', update);
 });
 
 // ─── Mode toggle ──────────────────────────────────────────────────────────────
