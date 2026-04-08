@@ -13,7 +13,7 @@ This tool answers that by checking **four critical clearance points** along the 
 The tool supports two obstacle types, selectable via a toggle:
 
 - **Ramp** — a descending slope (flat → slope down → flat). Common for driveway ramps and parking garage entrances.
-- **Bump** — a symmetrical speed bump (flat → rise → flat top → fall → flat). Models speed bumps and raised obstacles.
+- **Bump** — a speed bump profile (flat → rise → flat top → fall → flat). Models speed bumps, raised obstacles, and driveway lips.
 
 Both modes share the same car geometry and clearance checks, with the math adapted for the obstacle shape.
 
@@ -68,15 +68,37 @@ A 5-segment polyline:
   Upper flat ──► Rise ──► Flat top ──► Fall ──► Lower flat
 ```
 
-The bump rise/fall angles are derived from the slope grade input and bump height. The bump width defines the flat top.
+The bump rise and fall faces can have **independent angles** (asymmetric bump). If only one angle is entered, the other defaults to match — making a symmetric bump a special case.
 
-The slope angle can be entered in degrees or as a percentage grade (e.g. 15% ≈ 8.5°). The two are kept in sync automatically.
+- **Rise angle / grade** — steepness of the approach face
+- **Fall angle / grade** — steepness of the departure face (defaults to rise angle if not set)
+- **Bump height** — peak height above ground level
+- **Bump width** — length of the flat top
+
+The horizontal run of each face is derived from its angle and the bump height:
+`run = height / tan(angle)`
+
+The slope angle can be entered in degrees or as a percentage grade (e.g. 15% ≈ 8.5°). The two are kept in sync automatically, for both rise and fall.
+
+## Road lengths
+
+No road length inputs are exposed. All lengths are auto-computed from the car geometry:
+
+- **Upper flat**: `wheelbase + 2 m` — long enough that the rear tire starts well clear of the obstacle
+- **Lower flat** (ramp): `wheelbase + rear overhang + 2 m` — long enough that the rear bumper fully exits
+- **Lower flat** (bump): same formula, referenced from the fall base
+- **Ramp length**: `max(2 × wheelbase, 8 m) / cos(θ)` — along the slope surface
+
+These lengths are purely visual (they position the road ends on canvas). The clearance math depends only on obstacle angles and heights, not on how long the flat sections are.
 
 ## How clearance is computed
 
 For each scenario:
 1. The car's 5-point underside is transformed to world coordinates using the front axle position and the car's pitch angle on that section of road.
-2. For each car point, the signed perpendicular distance to the nearest road surface is computed — positive means the car is above the road, negative means it's scraping. Both flat and sloped face distances are handled (perpendicular-to-ramp for descending faces, perpendicular-to-rise for ascending faces).
+2. For each car point, the signed perpendicular distance to the nearest road surface is computed — positive means the car is above the road, negative means it's scraping.
+   - Descending faces use `perpToRamp(x, y, θ) = y·cos θ + x·sin θ`
+   - Ascending faces use `perpToRise(x, y, θ) = y·cos θ − x·sin θ`
+   - The fall face reuses `perpToRamp` by translating the coordinate origin to the fall corner `(fallTopX, bH)`
 3. The point and road contact with the smallest gap are tracked for visualization.
 4. The minimum gap across all points is the clearance for that scenario.
 
@@ -87,8 +109,8 @@ The canvas shows:
 - The worst-case car drawn solid (neutral gray), with FRONT/REAR labels
 - Ghost outlines of the other three scenarios (dashed, colored)
 - A descriptive label near each car (context-aware per mode)
-- A grade annotation at the transition point
-- A length annotation along the slope/rise face
+- Grade arc annotations at the transition points (both rise and fall in bump mode)
+- A height/width/face-length annotation for the obstacle
 - A left-side legend panel with colored dots, scenario names, clearance values, and elbow leader lines pointing to the tightest measurement points
 
 The results bar at the bottom shows a verdict (PASS / PASS-but-tight / FAIL) and per-check clearance with color coding.
@@ -103,17 +125,17 @@ Five built-in configurations:
 - **Sports car + 18% ramp** — lower clearance, shorter wheelbase
 
 **Bump mode:**
-- **Model 3 Perf + 100mm bump** — 100mm speed bump at 20% grade
-- **Model 3 Perf + 150mm bump** — 150mm speed bump at 20% grade
+- **Model 3 Perf + 100mm bump** — 100mm speed bump at 20% grade (symmetric)
+- **Model 3 Perf + 150mm bump** — 150mm speed bump at 20% grade (symmetric)
 
 ## Design notes
 
 - Pure vanilla HTML/CSS/JS — no frameworks, no build step, no dependencies.
-- Canvas bounding box is fixed across modes so the car renders at the same scale regardless of obstacle type.
+- Canvas bounding box tracks the road's left edge with a fixed 500 mm margin, then extends a fixed total width. This keeps the car rendered at the same scale regardless of obstacle type or car size.
 - Re-renders live on any input change.
 - The worst-case scenario is drawn solid; others are dashed ghosts for comparison.
-- Slope angle and grade percentage stay bidirectionally synced.
-- Bump mode uses a coordinate shift to align the road left edge with ramp mode, ensuring consistent visual framing.
+- Slope angle and grade percentage stay bidirectionally synced, independently for rise and fall.
+- Asymmetric bump: rise and fall faces each have their own angle; symmetric is the default (fall defaults to rise).
 - Units are millimetres and degrees throughout (automotive standard).
 
 ## Running it
