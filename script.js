@@ -325,24 +325,21 @@ function render(c, results) {
     }
   }
 
-  // Ramp angle + grade annotation — arc at top crest with two text lines
+  // Ramp grade annotation — arc at top crest
   {
     const [x0, y0] = road[1];
     const arcR = 60;
+    const grade = degToGrade(c.θ);
     ctx.save();
     ctx.strokeStyle = '#666';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(tx(x0), ty(y0), arcR, Math.PI, Math.PI + deg2rad(c.θ));
     ctx.stroke();
-    const grade = degToGrade(c.θ);
     ctx.fillStyle = '#333';
     ctx.font = '12px system-ui';
     ctx.textAlign = 'left';
-    ctx.fillText(`θ=${c.θ.toFixed(1)}°`, tx(x0) - arcR - 40, ty(y0) + 10);
-    ctx.font = '11px system-ui';
-    ctx.fillStyle = '#555';
-    ctx.fillText(`${grade.toFixed(1)}% grade`, tx(x0) - arcR - 40, ty(y0) + 24);
+    ctx.fillText(`${grade.toFixed(1)}% grade`, tx(x0) - arcR - 40, ty(y0) + 14);
     ctx.restore();
   }
 
@@ -451,7 +448,7 @@ function render(c, results) {
       const descColor = wFail ? '#d32f2f' : wTight ? '#e69500' : colors[worstIdx];
       ctx.globalAlpha = 0.7;
       ctx.fillStyle = descColor;
-      ctx.font = 'italic 11px system-ui';
+      ctx.font = 'italic 10px system-ui';
       ctx.textAlign = 'center';
       ctx.fillText(descLabels[worstIdx], tx(fx2), ty(fy2) - 28);
     }
