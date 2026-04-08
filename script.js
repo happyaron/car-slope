@@ -135,8 +135,17 @@ function buildCarProfile(c) {
 }
 
 // ─── Bump offset helper ──────────────────────────────────────────────────────
-// Returns the x-offset for the bump rise base, so upper flat starts at x=-3000.
-function bumpOx(c) { return -3000 + c.Uf; }
+// These span values shape the bump road in world x-coordinates:
+// - `upperFlatStart`: where the flat approach road begins on the left
+// - `riseBase`: where the flat road ends and the bump starts climbing
+// - `lowerFlatLen`: how much flat road continues after the bump returns to ground
+function bumpRoadSpan(c) {
+  return {
+    upperFlatStart: -6000,
+    riseBase: 1800,
+    lowerFlatLen: c.L + c.Or + 3800,
+  };
+}
 
 // ─── Road polyline ────────────────────────────────────────────────────────────
 // World: +x right, +y up. Origin = transition point.
@@ -145,17 +154,17 @@ function bumpOx(c) { return -3000 + c.Uf; }
 
 function buildRoad(c) {
   if (c.mode === 'bump') {
-    const { θ, θf, bH, bW, Lf } = c;
+    const { θ, θf, bH, bW } = c;
+    const { upperFlatStart, riseBase, lowerFlatLen } = bumpRoadSpan(c);
     const rXrise = bH / Math.tan(deg2rad(θ));
     const rXfall = bH / Math.tan(deg2rad(θf));
-    const ox = bumpOx(c);
     return [
-      [-3000, 0],                                    // upper flat (shifted)
-      [ox, 0],                                       // base of rise
-      [ox + rXrise, bH],                             // front edge of bump top
-      [ox + rXrise + bW, bH],                        // rear edge of bump top
-      [ox + rXrise + bW + rXfall, 0],                // back to ground level
-      [ox + rXrise + bW + rXfall + Lf, 0],           // lower flat
+      [upperFlatStart, 0],                              // upper flat
+      [riseBase, 0],                                    // base of rise
+      [riseBase + rXrise, bH],                          // front edge of bump top
+      [riseBase + rXrise + bW, bH],                     // rear edge of bump top
+      [riseBase + rXrise + bW + rXfall, 0],             // back to ground level
+      [riseBase + rXrise + bW + rXfall + lowerFlatLen, 0], // lower flat
     ];
   }
   const { θ, Lr, Uf, Lf } = c;
@@ -227,7 +236,7 @@ function checkApproach(c) {
   if (c.mode === 'bump') {
     const { θ, bH, bW } = c;
     const rX = bH / Math.tan(deg2rad(θ));
-    const ox = bumpOx(c);
+    const { riseBase: ox } = bumpRoadSpan(c);
     const riseBase = ox;
     const world = carToWorld(profile, riseBase, 0, 0);
     let minGap = Infinity, carPt = null, roadPt = null;
@@ -266,7 +275,7 @@ function checkBreakoverTop(c) {
     const { L, θ, bH, bW } = c;
     const rX = bH / Math.tan(deg2rad(θ));
     const θr = deg2rad(θ);
-    const ox = bumpOx(c);
+    const { riseBase: ox } = bumpRoadSpan(c);
     const riseBase = ox;
     const profile = buildCarProfile(c);
     const fa2 = [riseBase + L * Math.cos(θr), L * Math.sin(θr)];
@@ -315,7 +324,7 @@ function checkBreakoverBottom(c) {
     const { L, θ, θf, bH, bW } = c;
     const rXrise = bH / Math.tan(deg2rad(θ));
     const rXfall = bH / Math.tan(deg2rad(θf));
-    const ox = bumpOx(c);
+    const { riseBase: ox } = bumpRoadSpan(c);
     const riseBase = ox;
     const riseEnd = riseBase + rXrise;
     const fallTopX = riseEnd + bW;
@@ -372,7 +381,7 @@ function checkDeparture(c) {
     const { L, θ, θf, bH, bW } = c;
     const rXrise = bH / Math.tan(deg2rad(θ));
     const rXfall = bH / Math.tan(deg2rad(θf));
-    const ox = bumpOx(c);
+    const { riseBase: ox } = bumpRoadSpan(c);
     const riseBase = ox;
     const riseEnd = riseBase + rXrise;
     const fallTopX = riseEnd + bW;
@@ -441,7 +450,7 @@ function buildScenarios(c) {
     const { bH, bW, θf } = c;
     const rXrise = bH / Math.tan(θr);
     const rXfall = bH / Math.tan(deg2rad(θf));
-    const ox = bumpOx(c);
+    const { riseBase: ox } = bumpRoadSpan(c);
     const riseBase = ox;
     const fallEnd = ox + rXrise + bW + rXfall; // bottom of fall face (road[4])
 
