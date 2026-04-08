@@ -429,6 +429,69 @@ function render(c, results) {
     ctx.fillText(`${fail ? '' : '+'}${gap.toFixed(0)} mm`, lx + 105, y + 10);
   }
   ctx.restore();
+
+  // Direction arrow on the worst-scenario car (FRONT / REAR labels)
+  {
+    const { pts, fa, ra } = scenarios[worstIdx];
+    const color = results[scenarioKeys[worstIdx]].gap < 0 ? '#d32f2f' : colors[worstIdx];
+    // Car front = P0 (index 0), rear = P4 (index 4)
+    const [fx, fy] = pts[0]; // front bumper bottom
+    const [rx, ry] = pts[pts.length - 1]; // rear bumper bottom
+
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.font = 'bold 11px system-ui';
+    ctx.textAlign = 'center';
+
+    // "FRONT" label above P0
+    ctx.fillStyle = color;
+    ctx.fillText('FRONT', tx(fx), ty(fy) - 12);
+    // small arrow pointing at P0
+    ctx.beginPath();
+    ctx.moveTo(tx(fx), ty(fy) - 8);
+    ctx.lineTo(tx(fx) - 4, ty(fy) - 2);
+    ctx.lineTo(tx(fx) + 4, ty(fy) - 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // "REAR" label above P4
+    ctx.fillText('REAR', tx(rx), ty(ry) - 12);
+    ctx.beginPath();
+    ctx.moveTo(tx(rx), ty(ry) - 8);
+    ctx.lineTo(tx(rx) - 4, ty(ry) - 2);
+    ctx.lineTo(tx(rx) + 4, ty(ry) - 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Travel direction arrow along the road
+    {
+      const midRoadX = (road[1][0] + road[2][0]) / 2;
+      const midRoadY = (road[1][1] + road[2][1]) / 2;
+      const arrowY = ty(midRoadY) - 30;
+      const arrowX1 = tx(midRoadX) - 35;
+      const arrowX2 = tx(midRoadX) + 35;
+
+      ctx.strokeStyle = '#888';
+      ctx.fillStyle = '#888';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(arrowX1, arrowY);
+      ctx.lineTo(arrowX2, arrowY);
+      ctx.stroke();
+      // arrowhead pointing right
+      ctx.beginPath();
+      ctx.moveTo(arrowX2, arrowY);
+      ctx.lineTo(arrowX2 - 7, arrowY - 4);
+      ctx.lineTo(arrowX2 - 7, arrowY + 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.font = '10px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('travel direction', tx(midRoadX), arrowY - 8);
+    }
+
+    ctx.restore();
+  }
 }
 
 // ─── Results panel ────────────────────────────────────────────────────────────
