@@ -132,8 +132,9 @@ canvas {
   padding: .3rem .9rem;
   border-radius: 20px;
 }
-.verdict.pass { background: #d4f7dc; color: #1a6930; }
-.verdict.fail { background: #fde0e0; color: #8b1a1a; }
+.verdict.pass  { background: #d4f7dc; color: #1a6930; }
+.verdict.tight { background: #fff3cd; color: #856404; }
+.verdict.fail  { background: #fde0e0; color: #8b1a1a; }
 
 .check-item {
   font-size: .78rem;
@@ -145,8 +146,3 @@ canvas {
 .check-item.warn { background: #fff3e0; color: #e65100; }
 .check-item.bad  { background: #ffebee; color: #c62828; }
 
-.slope-annotation {
-  font-size: .78rem;
-  color: #555;
-  margin-left: auto;
-}

@@ -1,5 +1,8 @@
 'use strict';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+const TIGHT_MM = 50; // gap < 50mm = tight warning even if passing
+
 // ─── Presets ─────────────────────────────────────────────────────────────────
 const PRESETS = {
   m3p_easy: {
@@ -123,106 +126,98 @@ function perpToRamp(x, y, θ) {
   return y * Math.cos(θr) + x * Math.sin(θr);
 }
 
+// Projects a point onto the ramp line and returns the road-side point.
+function closestOnRamp(x, y, θ) {
+  const θr = deg2rad(θ);
+  // The ramp line: points on it satisfy y = -x*tan(θ).
+  // Projection: drop perpendicular to the ramp line.
+  // Parameter t along direction (cos(θ), -sin(θ)): t = x*cos(θ) - y*sin(θ).
+  const t = x * Math.cos(θr) - y * Math.sin(θr);
+  return [t * Math.cos(θr), -t * Math.sin(θr)];
+}
+
 // ─── Four clearance checks ────────────────────────────────────────────────────
-// Each check computes clearance in millimeters.
-// Positive = clear, negative = collision.
+// Each returns { gap, carPt, roadPt } where carPt/roadPt mark the tightest spot.
+// Positive gap = clear, negative = collision.
 
 function checkApproach(c) {
-  // Front tire at crest (0,0), car horizontal. Front bumper extends forward (+x) on the ramp.
-  // The front bumper bottom is at local (Of, Bf) where Bf = Of*tan(αa).
-  // Ramp at x = Of: road_y = -Of * tan(θ).
-  // Bumper at y = Bf = Of * tan(αa).
-  // Clearance = bumper_y - road_y = Of*(tan(αa) + tan(θ)).
-  // But the bumper might not be the lowest point. Check all profile points on the ramp.
   const profile = buildCarProfile(c);
   const world = carToWorld(profile, 0, 0, 0);
-  let minGap = Infinity;
+  let minGap = Infinity, carPt = null, roadPt = null;
   for (const [x, y] of world) {
-    if (x > 0) { // point is on the ramp (past crest)
+    if (x > 0) {
       const gap = perpToRamp(x, y, c.θ);
-      if (gap < minGap) minGap = gap;
-    } else { // point is on the upper flat
-      const gap = y; // flat is at y=0
-      if (gap < minGap) minGap = gap;
+      if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = closestOnRamp(x, y, c.θ); }
+    } else {
+      if (y < minGap) { minGap = y; carPt = [x, y]; roadPt = [x, 0]; }
     }
   }
-  return minGap;
+  return { gap: minGap, carPt, roadPt };
 }
 
 function checkBreakoverTop(c) {
-  // Front tire on ramp, rear tire at crest (0,0). Worst case: rear at crest.
-  // Car is tilted nose-down by θ.
   const { L, θ } = c;
   const θr = deg2rad(θ);
-  const fx = L * Math.cos(θr);
-  const fy = -L * Math.sin(θr);
+  const fx = L * Math.cos(θr), fy = -L * Math.sin(θr);
   const profile = buildCarProfile(c);
   const world = carToWorld(profile, fx, fy, -θr);
-  let minGap = Infinity;
+  let minGap = Infinity, carPt = null, roadPt = null;
   for (const [x, y] of world) {
-    if (x > 0) { // on the ramp
+    if (x > 0) {
       const gap = perpToRamp(x, y, θ);
-      if (gap < minGap) minGap = gap;
-    } else { // on the upper flat
-      const gap = y;
-      if (gap < minGap) minGap = gap;
+      if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = closestOnRamp(x, y, θ); }
+    } else {
+      if (y < minGap) { minGap = y; carPt = [x, y]; roadPt = [x, 0]; }
     }
   }
-  return minGap;
+  return { gap: minGap, carPt, roadPt };
 }
 
 function checkBreakoverBottom(c) {
-  // Front tire at bottom crest on flat (rX, -rH). Rear tire still on ramp.
-  // Car tilts nose-down because front is on the lower flat, rear on the ramp.
-  // Car angle = -θ.
-  const { L, h, θ, Lr } = c;
+  const { L, θ, Lr } = c;
   const θr = deg2rad(θ);
-  const rX = Lr * Math.cos(θr);
-  const rH = Lr * Math.sin(θr);
+  const rX = Lr * Math.cos(θr), rH = Lr * Math.sin(θr);
   const profile = buildCarProfile(c);
   const world = carToWorld(profile, rX, -rH, -θr);
-  let minGap = Infinity;
+  let minGap = Infinity, carPt = null, roadPt = null;
   for (const [x, y] of world) {
-    if (x <= rX + 50) { // on the ramp or at the crest
+    if (x <= rX + 50) {
       const gap = perpToRamp(x, y, θ);
-      if (gap < minGap) minGap = gap;
-    } else { // on the lower flat
-      const gap = y + rH; // flat is at y = -rH
-      if (gap < minGap) minGap = gap;
+      if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = closestOnRamp(x, y, θ); }
+    } else {
+      const gap = y + rH;
+      if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = [x, -rH]; }
     }
   }
-  return minGap;
+  return { gap: minGap, carPt, roadPt };
 }
 
 function checkDeparture(c) {
-  // Rear tire at bottom crest, car horizontal on lower flat.
-  // Rear tire at (rX, -rH). Car angle = 0.
   const { L, θ, Lr } = c;
   const θr = deg2rad(θ);
-  const rX = Lr * Math.cos(θr);
-  const rH = Lr * Math.sin(θr);
+  const rX = Lr * Math.cos(θr), rH = Lr * Math.sin(θr);
   const profile = buildCarProfile(c);
   const world = carToWorld(profile, rX + L, -rH, 0);
-  let minGap = Infinity;
+  let minGap = Infinity, carPt = null, roadPt = null;
   for (const [x, y] of world) {
-    if (x <= rX + 50) { // on the ramp
+    if (x <= rX + 50) {
       const gap = perpToRamp(x, y, θ);
-      if (gap < minGap) minGap = gap;
-    } else { // on the lower flat
+      if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = closestOnRamp(x, y, θ); }
+    } else {
       const gap = y + rH;
-      if (gap < minGap) minGap = gap;
+      if (gap < minGap) { minGap = gap; carPt = [x, y]; roadPt = [x, -rH]; }
     }
   }
-  return minGap;
+  return { gap: minGap, carPt, roadPt };
 }
 
 // ─── Run all checks ───────────────────────────────────────────────────────────
 function runChecks(c) {
   return {
-    approach:      { gap: checkApproach(c), label: 'Approach' },
-    breakoverTop:  { gap: checkBreakoverTop(c), label: 'Top crest' },
-    breakoverBot:  { gap: checkBreakoverBottom(c), label: 'Bottom belly' },
-    departure:     { gap: checkDeparture(c), label: 'Departure' },
+    approach:      { ...checkApproach(c), label: 'Front bumper vs ramp' },
+    breakoverTop:  { ...checkBreakoverTop(c), label: 'Belly vs top crest' },
+    breakoverBot:  { ...checkBreakoverBottom(c), label: 'Belly vs bottom' },
+    departure:     { ...checkDeparture(c), label: 'Rear bumper vs ramp' },
   };
 }
 
@@ -272,14 +267,11 @@ function render(c, results) {
   const gaps = scenarioKeys.map(k => results[k].gap);
   const worstIdx = gaps.indexOf(Math.min(...gaps));
 
-  // Bounding box
-  let bx1 = Infinity, bx2 = -Infinity, by1 = Infinity, by2 = -Infinity;
-  const expand = ([x, y]) => {
-    if (x < bx1) bx1 = x; if (x > bx2) bx2 = x;
-    if (y < by1) by1 = y; if (y > by2) by2 = y;
-  };
-  road.forEach(expand);
-  scenarios.forEach(s => s.pts.forEach(expand));
+  // Stable bounding box: hardcoded constants so presets never shift the view.
+  const bx1 = -3000;
+  const bx2 = 23500;
+  const by1 = -6500;
+  const by2 = 1200;
 
   const PAD = 90;
   const scale = Math.min(
@@ -299,8 +291,8 @@ function render(c, results) {
   ctx.beginPath();
   ctx.moveTo(tx(road[0][0]), ty(road[0][1]));
   for (const [x, y] of road) ctx.lineTo(tx(x), ty(y));
-  ctx.lineTo(tx(road[road.length - 1][0]), ty(by1 - 500));
-  ctx.lineTo(tx(road[0][0]), ty(by1 - 500));
+  ctx.lineTo(tx(road[road.length - 1][0]), ty(by1));
+  ctx.lineTo(tx(road[0][0]), ty(by1));
   ctx.closePath();
   ctx.fillStyle = '#c8d8b0';
   ctx.fill();
@@ -342,13 +334,56 @@ function render(c, results) {
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(tx(x0), ty(y0), arcR, Math.PI, Math.PI + deg2rad(c.θ));
-    ctx.stroke();
-    ctx.fillStyle = '#333';
-    ctx.font = '12px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText(`θ=${c.θ.toFixed(1)}°`, tx(x0) - arcR - 40, ty(y0) + 14);
     ctx.restore();
+
+    // Ramp spec annotation — small box near the middle of the ramp
+    {
+      const midX = (road[1][0] + road[2][0]) / 2;
+      const midY = (road[1][1] + road[2][1]) / 2;
+      const grade = degToGrade(c.θ);
+      const lines = [
+        `θ = ${c.θ.toFixed(1)}°`,
+        `${grade.toFixed(1)}% grade`,
+        `L = ${(c.Lr / 1000).toFixed(1)} m`,
+      ];
+      ctx.save();
+      ctx.font = '10px system-ui';
+      ctx.textAlign = 'center';
+      const lineH = 13;
+      const boxW = 90;
+      const boxH = lines.length * lineH + 6;
+      // Position: above the ramp midpoint, offset perpendicular to the ramp
+      const perpOff = 35; // screen pixels above the ramp
+      const bx = tx(midX);
+      const by = ty(midY) - perpOff;
+      ctx.fillStyle = 'rgba(255,255,255,0.82)';
+      ctx.strokeStyle = '#bbb';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(bx - boxW / 2, by - boxH / 2, boxW, boxH, 4);
+      } else {
+        const rr = 4;
+        const x1 = bx - boxW / 2, y1 = by - boxH / 2;
+        ctx.moveTo(x1 + rr, y1);
+        ctx.arcTo(x1 + boxW, y1, x1 + boxW, y1 + boxH, rr);
+        ctx.arcTo(x1 + boxW, y1 + boxH, x1, y1 + boxH, rr);
+        ctx.arcTo(x1, y1 + boxH, x1, y1, rr);
+        ctx.arcTo(x1, y1, x1 + boxW, y1, rr);
+        ctx.closePath();
+      }
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#555';
+      lines.forEach((line, i) => {
+        ctx.fillText(line, bx, by - boxH / 2 + 12 + i * lineH);
+      });
+      ctx.restore();
+    }
   }
+
+  // Short names used everywhere: ghost labels, left panel, results bar
+  const shortLabels = ['Front bumper', 'Belly (top)', 'Belly (bottom)', 'Rear bumper'];
 
   // Draw scenarios
   for (let si = 0; si < scenarios.length; si++) {
@@ -369,11 +404,21 @@ function render(c, results) {
       for (const [x, y] of pts) ctx.lineTo(tx(x), ty(y));
       ctx.stroke();
       ctx.setLineDash([]);
+
+      // Small label near the front bumper of each ghost car
+      const [fx, fy] = pts[0];
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = color;
+      ctx.font = '9px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(shortLabels[si], tx(fx), ty(fy) - 8);
       ctx.restore();
       continue;
     }
 
     ctx.save();
+    // Worst car drawn in neutral gray — the callout labels carry the per-scenario colors
+    const carColor = '#444';
     // Fill car body
     const topY = Math.max(...pts.map(([, y]) => y)) + c.r + 80;
     ctx.beginPath();
@@ -382,14 +427,14 @@ function render(c, results) {
     ctx.lineTo(tx(pts[pts.length - 1][0]), ty(topY));
     ctx.lineTo(tx(pts[0][0]), ty(topY));
     ctx.closePath();
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = carColor;
+    ctx.globalAlpha = 0.08;
     ctx.fill();
 
     // Underside outline
-    ctx.globalAlpha = 0.95;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = carColor;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(tx(pts[0][0]), ty(pts[0][1]));
     for (const [x, y] of pts) ctx.lineTo(tx(x), ty(y));
@@ -400,40 +445,21 @@ function render(c, results) {
     for (const [ax, ay] of [fa, ra]) {
       ctx.beginPath();
       ctx.arc(tx(ax), ty(ay), screenR, 0, Math.PI * 2);
-      ctx.strokeStyle = color;
+      ctx.strokeStyle = carColor;
       ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.4;
       ctx.stroke();
       ctx.fillStyle = '#444';
-      ctx.globalAlpha = 0.08;
+      ctx.globalAlpha = 0.06;
       ctx.fill();
     }
     ctx.restore();
   }
 
-  // Legend
-  ctx.save();
-  ctx.globalAlpha = 1;
-  const lx = W - 165, ly = 15;
-  for (let si = 0; si < scenarioKeys.length; si++) {
-    const { gap, label } = results[scenarioKeys[si]];
-    const fail = gap < 0;
-    const y = ly + si * 20;
-    ctx.fillStyle = fail ? '#d32f2f' : colors[si];
-    ctx.fillRect(lx, y, 14, 10);
-    ctx.fillStyle = '#222';
-    ctx.font = '11px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText(label, lx + 18, y + 10);
-    ctx.fillStyle = fail ? '#d32f2f' : '#2e7d32';
-    ctx.fillText(`${fail ? '' : '+'}${gap.toFixed(0)} mm`, lx + 105, y + 10);
-  }
-  ctx.restore();
-
   // Direction arrow on the worst-scenario car (FRONT / REAR labels)
   {
     const { pts, fa, ra } = scenarios[worstIdx];
-    const color = results[scenarioKeys[worstIdx]].gap < 0 ? '#d32f2f' : colors[worstIdx];
+    const color = '#555';
     // Car front = P0 (index 0), rear = P4 (index 4)
     const [fx, fy] = pts[0]; // front bumper bottom
     const [rx, ry] = pts[pts.length - 1]; // rear bumper bottom
@@ -492,27 +518,174 @@ function render(c, results) {
 
     ctx.restore();
   }
+
+  // ─── Clearance callout annotations ──────────────────────────────────────────
+  // Labels are arranged in a vertical column at the top-left of the canvas.
+  // Each label has a small colored dot, the scenario name, clearance value,
+  // and an elbow leader line to the measurement point on the car/road.
+  // This avoids text congestion near the car silhouette.
+
+  {
+    const LABEL_FONT = '11px system-ui';
+    const LABEL_FONT_BOLD = 'bold 11px system-ui';
+    const ROW_H = 22;
+    const COL_X = 12;
+    const COL_TOP_Y = 22;
+    const DOT_R = 4;
+
+    // Pre-measure label width for background
+    ctx.font = LABEL_FONT;
+    const allLabels = scenarioKeys.map((k, i) => {
+      const r = results[k];
+      return shortLabels[i] + ' ' + (r.gap < 0 ? '' : '+') + r.gap.toFixed(0) + 'mm';
+    });
+    const maxLabelW = Math.max(...allLabels.map(t => ctx.measureText(t).width));
+    const bgW = maxLabelW + DOT_R * 2 + 18;
+    const bgH = scenarioKeys.length * ROW_H + 12;
+
+    // Semi-transparent background panel for the labels
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth = 1;
+    const bgX = 4, bgY = 6;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(bgX, bgY, bgW, bgH, 5);
+    } else {
+      const r = 5;
+      ctx.moveTo(bgX + r, bgY);
+      ctx.arcTo(bgX + bgW, bgY, bgX + bgW, bgY + bgH, r);
+      ctx.arcTo(bgX + bgW, bgY + bgH, bgX, bgY + bgH, r);
+      ctx.arcTo(bgX, bgY + bgH, bgX, bgY, r);
+      ctx.arcTo(bgX, bgY, bgX + bgW, bgY, r);
+      ctx.closePath();
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    for (let si = 0; si < scenarioKeys.length; si++) {
+      const key = scenarioKeys[si];
+      const { gap, carPt, roadPt, label } = results[key];
+      if (!carPt || !roadPt) continue;
+
+      const fail = gap < 0;
+      const tight = !fail && gap < TIGHT_MM;
+      const markColor = fail ? '#d32f2f' : tight ? '#e69500' : colors[si];
+
+      // Label row position
+      const rowY = COL_TOP_Y + si * ROW_H + 4;
+      const dotX = COL_X + DOT_R + 2;
+      const textX = COL_X + DOT_R * 2 + 8;
+      const textY = rowY + 12;
+
+      // Colored dot
+      ctx.beginPath();
+      ctx.arc(dotX, textY, DOT_R, 0, Math.PI * 2);
+      ctx.fillStyle = markColor;
+      ctx.fill();
+
+      // Text
+      ctx.font = LABEL_FONT_BOLD;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = markColor;
+      const gapText = (fail ? '' : '+') + gap.toFixed(0) + 'mm';
+      ctx.fillText(shortLabels[si] + ' ' + gapText, textX, textY);
+
+      // Leader line: elbow from label area out to the measurement spot
+      const sx = tx(carPt[0]), sy = ty(carPt[1]);
+      const ex = tx(roadPt[0]), ey = ty(roadPt[1]);
+
+      // Measurement dot on the car point
+      ctx.beginPath();
+      ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+      ctx.fillStyle = markColor;
+      ctx.fill();
+
+      // Elbow leader: from right edge of label panel → horizontally to
+      // above the measurement point → down to the dot
+      const anchorX = bgX + bgW + 6;
+      const anchorY = textY;
+      ctx.save();
+      ctx.strokeStyle = markColor;
+      ctx.lineWidth = 0.8;
+      ctx.globalAlpha = 0.55;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.moveTo(anchorX, anchorY);
+      ctx.lineTo(sx, anchorY);   // horizontal arm
+      ctx.lineTo(sx, sy);        // vertical arm down to dot
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // Dimension line between car point and road point
+      ctx.save();
+      ctx.strokeStyle = markColor;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.45;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // Tick mark at road point
+      ctx.save();
+      ctx.strokeStyle = markColor;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.55;
+      const segLen = 12;
+      const onFlat = Math.abs(roadPt[0] - carPt[0]) < 1;
+      ctx.beginPath();
+      if (onFlat) {
+        ctx.moveTo(ex - segLen, ey);
+        ctx.lineTo(ex + segLen, ey);
+      } else {
+        const θr = deg2rad(c.θ);
+        ctx.moveTo(ex - segLen * Math.cos(θr), ey + segLen * Math.sin(θr));
+        ctx.lineTo(ex + segLen * Math.cos(θr), ey - segLen * Math.sin(θr));
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
 }
 
 // ─── Results panel ────────────────────────────────────────────────────────────
 function updateResults(results) {
   const keys = ['approach', 'breakoverTop', 'breakoverBot', 'departure'];
   const ids = ['chk-approach', 'chk-breakover-top', 'chk-breakover-bot', 'chk-departure'];
-  const labels = ['Approach', 'Top crest', 'Bottom belly', 'Departure'];
+  const labels = ['Front bumper', 'Belly (top)', 'Belly (bottom)', 'Rear bumper'];
 
   let allPass = true;
+  let anyTight = false;
   keys.forEach((k, i) => {
     const gap = results[k].gap;
     const el = document.getElementById(ids[i]);
     const pass = gap >= 0;
+    const tight = pass && gap < TIGHT_MM;
     if (!pass) allPass = false;
-    el.className = 'check-item ' + (pass ? 'ok' : (gap > -20 ? 'warn' : 'bad'));
+    if (tight) anyTight = true;
+    el.className = 'check-item ' + (!pass ? 'bad' : tight ? 'warn' : 'ok');
     el.textContent = `${labels[i]}: ${pass ? '+' : ''}${gap.toFixed(0)} mm`;
   });
 
   const v = document.getElementById('verdict');
-  v.className = 'verdict ' + (allPass ? 'pass' : 'fail');
-  v.textContent = allPass ? 'PASS — Car clears the ramp' : 'FAIL — Collision detected';
+  if (!allPass) {
+    v.className = 'verdict fail';
+    v.textContent = 'FAIL — Collision detected';
+  } else if (anyTight) {
+    v.className = 'verdict tight';
+    v.textContent = 'PASS — but margins are tight';
+  } else {
+    v.className = 'verdict pass';
+    v.textContent = 'PASS — Car clears the ramp';
+  }
 }
 
 // ─── Main update ──────────────────────────────────────────────────────────────
@@ -522,8 +695,6 @@ function update() {
   const results = runChecks(c);
   render(c, results);
   updateResults(results);
-  document.getElementById('slope-info').textContent =
-    `Slope: ${c.θ.toFixed(2)}° (${degToGrade(c.θ).toFixed(1)}% grade)`;
 }
 
 // ─── Sync ramp angle ↔ grade ──────────────────────────────────────────────────
@@ -541,14 +712,17 @@ document.querySelectorAll('input[type=number]').forEach(el => {
 });
 
 // ─── Canvas resize ────────────────────────────────────────────────────────────
-function resizeCanvas() {
+// Size canvas once on load; subsequent updates only redraw without changing
+// canvas dimensions so the visual outline stays stable.
+let canvasSized = false;
+function sizeCanvas() {
+  if (canvasSized) return;
   const wrap = document.getElementById('canvas-wrap');
   canvas.width = Math.max(600, wrap.clientWidth - 32);
   canvas.height = Math.max(300, wrap.clientHeight - 32);
-  update();
+  canvasSized = true;
 }
-window.addEventListener('resize', resizeCanvas);
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-resizeCanvas();
+sizeCanvas();
 loadPreset('m3p_easy');
