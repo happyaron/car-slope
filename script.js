@@ -705,7 +705,7 @@ function render(c, results) {
       const anchorPt = (si === 2 && worstIdx <= 1) ? pts[pts.length - 1] : pts[0];
       const [fx, fy] = anchorPt;
       const xNudge = (si === 0 && worstIdx >= 2) ? -44 : 0;
-      const yOff = si === 1 ? -28 : -10;
+      const yOff = (si === 1 || (bumpMode && si === 0)) ? -28 : -10;
       ctx.globalAlpha = 0.4;
       ctx.fillStyle = color;
       ctx.font = 'italic 10px system-ui';
