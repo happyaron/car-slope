@@ -93,7 +93,7 @@ function readInputs() {
   };
   // Lengths are auto-computed from car geometry — they only affect canvas display,
   // not any clearance calculation (all length terms cancel in the perp-distance algebra).
-  base.Uf = base.L + 2000;            // flat before obstacle: wheelbase + 2m margin
+  base.Uf = base.L + 3000;            // flat before obstacle: wheelbase + 3m margin
   base.Lf = base.L + base.Or + 2000;  // flat after obstacle: wheelbase + rear overhang + 2m
 
   if (mode === 'bump') {
@@ -796,11 +796,17 @@ function render(c, results) {
     ctx.closePath();
     ctx.fill();
 
-    // Travel direction arrow — fixed top-right corner, never overlaps world objects
+    // Travel direction arrow — anchored to the road surface in the lower-left
+    // of the road canvas area: placed on the upper flat, 60% of the way to
+    // the first obstacle transition, sitting just above the road surface line.
     {
-      const arrowX2 = W - 16;
-      const arrowX1 = arrowX2 - 64;
-      const arrowY = 22;
+      const flatMidX = road[0][0] + (road[1][0] - road[0][0]) * 0.15;
+      const anchorCx = tx(flatMidX);
+      const anchorCy = ty(road[0][1]); // road[0][1] is 0 (flat surface)
+      const arrowLen = 56;
+      const arrowX1 = anchorCx - arrowLen / 2;
+      const arrowX2 = anchorCx + arrowLen / 2;
+      const arrowY = anchorCy - 10;
 
       ctx.strokeStyle = '#888';
       ctx.fillStyle = '#888';
@@ -817,7 +823,7 @@ function render(c, results) {
       ctx.fill();
       ctx.font = '10px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText('travel direction', (arrowX1 + arrowX2) / 2, arrowY - 8);
+      ctx.fillText('travel direction', anchorCx, arrowY - 8);
     }
 
     ctx.restore();
