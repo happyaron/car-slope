@@ -325,7 +325,7 @@ function render(c, results) {
     }
   }
 
-  // Ramp angle annotation
+  // Ramp angle + grade annotation — arc at top crest with two text lines
   {
     const [x0, y0] = road[1];
     const arcR = 60;
@@ -334,56 +334,44 @@ function render(c, results) {
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(tx(x0), ty(y0), arcR, Math.PI, Math.PI + deg2rad(c.θ));
+    ctx.stroke();
+    const grade = degToGrade(c.θ);
+    ctx.fillStyle = '#333';
+    ctx.font = '12px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText(`θ=${c.θ.toFixed(1)}°`, tx(x0) - arcR - 40, ty(y0) + 10);
+    ctx.font = '11px system-ui';
+    ctx.fillStyle = '#555';
+    ctx.fillText(`${grade.toFixed(1)}% grade`, tx(x0) - arcR - 40, ty(y0) + 24);
     ctx.restore();
-
-    // Ramp spec annotation — small box near the middle of the ramp
-    {
-      const midX = (road[1][0] + road[2][0]) / 2;
-      const midY = (road[1][1] + road[2][1]) / 2;
-      const grade = degToGrade(c.θ);
-      const lines = [
-        `θ = ${c.θ.toFixed(1)}°`,
-        `${grade.toFixed(1)}% grade`,
-        `L = ${(c.Lr / 1000).toFixed(1)} m`,
-      ];
-      ctx.save();
-      ctx.font = '10px system-ui';
-      ctx.textAlign = 'center';
-      const lineH = 13;
-      const boxW = 90;
-      const boxH = lines.length * lineH + 6;
-      // Position: above the ramp midpoint, offset perpendicular to the ramp
-      const perpOff = 35; // screen pixels above the ramp
-      const bx = tx(midX);
-      const by = ty(midY) - perpOff;
-      ctx.fillStyle = 'rgba(255,255,255,0.82)';
-      ctx.strokeStyle = '#bbb';
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      if (ctx.roundRect) {
-        ctx.roundRect(bx - boxW / 2, by - boxH / 2, boxW, boxH, 4);
-      } else {
-        const rr = 4;
-        const x1 = bx - boxW / 2, y1 = by - boxH / 2;
-        ctx.moveTo(x1 + rr, y1);
-        ctx.arcTo(x1 + boxW, y1, x1 + boxW, y1 + boxH, rr);
-        ctx.arcTo(x1 + boxW, y1 + boxH, x1, y1 + boxH, rr);
-        ctx.arcTo(x1, y1 + boxH, x1, y1, rr);
-        ctx.arcTo(x1, y1, x1 + boxW, y1, rr);
-        ctx.closePath();
-      }
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = '#555';
-      lines.forEach((line, i) => {
-        ctx.fillText(line, bx, by - boxH / 2 + 12 + i * lineH);
-      });
-      ctx.restore();
-    }
   }
 
-  // Short names used everywhere: ghost labels, left panel, results bar
+  // Ramp length annotation — along the ramp midpoint
+  {
+    const midX = (road[1][0] + road[2][0]) / 2;
+    const midY = (road[1][1] + road[2][1]) / 2;
+    const θr = deg2rad(c.θ);
+    // Offset perpendicular (above ramp surface) in world coords
+    const off = 300; // mm above the ramp
+    const wx = midX - off * Math.sin(θr);
+    const wy = midY + off * Math.cos(θr);
+    ctx.save();
+    ctx.fillStyle = '#555';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(`L = ${(c.Lr / 1000).toFixed(1)} m`, tx(wx), ty(wy));
+    ctx.restore();
+  }
+
+  // Short names used in left panel and results bar
   const shortLabels = ['Front bumper', 'Belly (top)', 'Belly (bottom)', 'Rear bumper'];
+  // Descriptive texts shown near the car/ramp on canvas
+  const descLabels = [
+    'front bumper approaches crest',
+    'belly clears top crest',
+    'belly clears bottom edge',
+    'rear bumper leaves ramp',
+  ];
 
   // Draw scenarios
   for (let si = 0; si < scenarios.length; si++) {
@@ -405,13 +393,13 @@ function render(c, results) {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Small label near the front bumper of each ghost car
+      // Descriptive label near each ghost car
       const [fx, fy] = pts[0];
-      ctx.globalAlpha = 0.35;
+      ctx.globalAlpha = 0.4;
       ctx.fillStyle = color;
-      ctx.font = '9px system-ui';
+      ctx.font = 'italic 10px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText(shortLabels[si], tx(fx), ty(fy) - 8);
+      ctx.fillText(descLabels[si], tx(fx), ty(fy) - 10);
       ctx.restore();
       continue;
     }
@@ -453,6 +441,21 @@ function render(c, results) {
       ctx.globalAlpha = 0.06;
       ctx.fill();
     }
+
+    // Descriptive label near the worst car — use scenario color (matches left panel)
+    {
+      const [fx2, fy2] = pts[0];
+      const { gap: wGap } = results[scenarioKeys[worstIdx]];
+      const wFail = wGap < 0;
+      const wTight = !wFail && wGap < TIGHT_MM;
+      const descColor = wFail ? '#d32f2f' : wTight ? '#e69500' : colors[worstIdx];
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = descColor;
+      ctx.font = 'italic 11px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(descLabels[worstIdx], tx(fx2), ty(fy2) - 28);
+    }
+
     ctx.restore();
   }
 
@@ -530,7 +533,6 @@ function render(c, results) {
     const LABEL_FONT_BOLD = 'bold 11px system-ui';
     const ROW_H = 22;
     const COL_X = 12;
-    const COL_TOP_Y = 22;
     const DOT_R = 4;
 
     // Pre-measure label width for background
@@ -540,7 +542,7 @@ function render(c, results) {
       return shortLabels[i] + ' ' + (r.gap < 0 ? '' : '+') + r.gap.toFixed(0) + 'mm';
     });
     const maxLabelW = Math.max(...allLabels.map(t => ctx.measureText(t).width));
-    const bgW = maxLabelW + DOT_R * 2 + 18;
+    const bgW = maxLabelW + DOT_R * 2 + 28;
     const bgH = scenarioKeys.length * ROW_H + 12;
 
     // Semi-transparent background panel for the labels
@@ -574,11 +576,11 @@ function render(c, results) {
       const tight = !fail && gap < TIGHT_MM;
       const markColor = fail ? '#d32f2f' : tight ? '#e69500' : colors[si];
 
-      // Label row position
-      const rowY = COL_TOP_Y + si * ROW_H + 4;
+      // Label row position — center dot and text vertically within the row
+      const rowY = bgY + 6 + si * ROW_H + ROW_H / 2;
       const dotX = COL_X + DOT_R + 2;
       const textX = COL_X + DOT_R * 2 + 8;
-      const textY = rowY + 12;
+      const textY = rowY;
 
       // Colored dot
       ctx.beginPath();
