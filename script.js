@@ -5,31 +5,25 @@ const TIGHT_MM = 50; // gap < 50mm = tight warning even if passing
 
 // ─── Presets ─────────────────────────────────────────────────────────────────
 const PRESETS = {
-  m3p_easy: {
+  ramp_15: {
     mode: 'ramp',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
     approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
     rampGrade: 15,
   },
-  m3p_hard: {
+  ramp_20: {
     mode: 'ramp',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
     approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
     rampGrade: 20,
   },
-  sports: {
-    mode: 'ramp',
-    wheelbase: 2450, clearance: 110, frontOverhang: 900, rearOverhang: 750,
-    approachAngle: 12, departureAngle: 14, breakoverAngle: 10, tireRadius: 320,
-    rampGrade: 18,
-  },
-  m3p_bump100: {
+  bump_100: {
     mode: 'bump',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
     approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
     rampGrade: 20, rampGradeFall: 20, bumpHeight: 100, bumpWidth: 1000,
   },
-  m3p_bump150: {
+  bump_150: {
     mode: 'bump',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
     approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
@@ -63,6 +57,7 @@ function syncModeUI() {
   const bump = document.getElementById('modeBump').checked;
   document.querySelectorAll('.ramp-only').forEach(el => el.style.display = bump ? 'none' : '');
   document.querySelectorAll('.bump-only').forEach(el => el.style.display = bump ? '' : 'none');
+  document.getElementById('slopeLegend').textContent = bump ? 'Bump obstacle' : 'Ramp obstacle';
   if (bump) {
     // Default fall angle = rise angle for symmetric bump when switching modes
     const riseAngle = document.getElementById('rampAngle').value;
@@ -801,20 +796,11 @@ function render(c, results) {
     ctx.closePath();
     ctx.fill();
 
-    // Travel direction arrow along the road
+    // Travel direction arrow — fixed top-right corner, never overlaps world objects
     {
-      let midRoadX, midRoadY;
-      if (c.mode === 'bump') {
-        // Place arrow on the lower flat, well past the fall — clear of all bump geometry
-        midRoadX = road[4][0] + 400;
-        midRoadY = 0;
-      } else {
-        midRoadX = (road[1][0] + road[2][0]) / 2;
-        midRoadY = (road[1][1] + road[2][1]) / 2;
-      }
-      const arrowY = ty(midRoadY) - 30;
-      const arrowX1 = tx(midRoadX) - 35;
-      const arrowX2 = tx(midRoadX) + 35;
+      const arrowX2 = W - 16;
+      const arrowX1 = arrowX2 - 64;
+      const arrowY = 22;
 
       ctx.strokeStyle = '#888';
       ctx.fillStyle = '#888';
@@ -823,7 +809,6 @@ function render(c, results) {
       ctx.moveTo(arrowX1, arrowY);
       ctx.lineTo(arrowX2, arrowY);
       ctx.stroke();
-      // arrowhead pointing right
       ctx.beginPath();
       ctx.moveTo(arrowX2, arrowY);
       ctx.lineTo(arrowX2 - 7, arrowY - 4);
@@ -832,7 +817,7 @@ function render(c, results) {
       ctx.fill();
       ctx.font = '10px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText('travel direction', tx(midRoadX), arrowY - 8);
+      ctx.fillText('travel direction', (arrowX1 + arrowX2) / 2, arrowY - 8);
     }
 
     ctx.restore();
@@ -1061,4 +1046,4 @@ function sizeCanvas() {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 sizeCanvas();
 syncModeUI();
-loadPreset('m3p_easy');
+loadPreset('ramp_15');

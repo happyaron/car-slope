@@ -15,11 +15,10 @@
 
 <div class="presets">
   <span>Presets:</span>
-  <button onclick="loadPreset('m3p_easy')">Model 3 Perf + 15% ramp</button>
-  <button onclick="loadPreset('m3p_hard')">Model 3 Perf + 20% ramp</button>
-  <button onclick="loadPreset('sports')">Sports car + 18% ramp</button>
-  <button onclick="loadPreset('m3p_bump100')">Model 3 Perf + 100mm bump</button>
-  <button onclick="loadPreset('m3p_bump150')">Model 3 Perf + 150mm bump</button>
+  <button onclick="loadPreset('ramp_15')">15% ramp</button>
+  <button onclick="loadPreset('ramp_20')">20% ramp</button>
+  <button onclick="loadPreset('bump_100')">100mm bump</button>
+  <button onclick="loadPreset('bump_150')">150mm bump</button>
 </div>
 
 <div class="main">
@@ -70,7 +69,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>Slope / ramp</legend>
+      <legend id="slopeLegend">Ramp obstacle</legend>
 
       <div class="field mode-toggle">
         <label>Mode</label>
