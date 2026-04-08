@@ -646,18 +646,16 @@ function render(c, results) {
       }
       ctx.restore();
     } else {
-      const midX = (road[1][0] + road[2][0]) / 2;
-      const midY = (road[1][1] + road[2][1]) / 2;
-      const label = `L = ${(c.Lr / 1000).toFixed(1)} m`;
-      const θr = deg2rad(c.θ);
-      const off = 300;
-      const wx = midX - off * Math.sin(θr);
-      const wy = midY + off * Math.cos(θr);
+      // Mirror the "travel direction" arrow position: same x on the upper flat,
+      // but below the road surface line (into the ground fill).
+      const flatMidX = road[0][0] + (road[1][0] - road[0][0]) * 0.15;
+      const anchorCx = tx(flatMidX);
+      const anchorCy = ty(road[0][1]);
       ctx.save();
       ctx.fillStyle = '#555';
       ctx.font = '11px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText(label, tx(wx), ty(wy));
+      ctx.fillText(`L = ${(c.Lr / 1000).toFixed(1)} m`, anchorCx, anchorCy + 18);
       ctx.restore();
     }
   }
