@@ -44,10 +44,11 @@ Key geometry:
 - **Ground clearance** — height of the lowest chassis point above the road (with tires mounted)
 - **Front/rear overhang** — distance from axle to bumper
 - **Approach/departure angles** — the steepest ramp angle the bumper can clear
-- **Breakover angle** — the steepest crest the belly can clear
 - **Tire radius** — wheel outer radius, used for canvas rendering only (not clearance math)
 
-The approach and departure angles determine how steeply the underside rises from the belly to the bumpers. The breakover angle defines the V-shape at the belly nadir (midpoint between axles).
+The approach and departure angles determine how steeply the underside rises from the belly to the bumpers. The belly itself is modeled as a flat line at ground clearance height between the two transition points.
+
+The **breakover angle** is not an input — it is computed from the car geometry as `2 × arctan(2h / L)` and displayed as a derived value. It represents the steepest symmetric crest the belly can straddle without scraping.
 
 ## Road model
 
@@ -114,8 +115,11 @@ The canvas shows:
 - Grade arc annotations at the transition points (both rise and fall in bump mode)
 - A height/width/face-length annotation for the obstacle
 - A left-side legend panel with colored dots, scenario names, clearance values, and elbow leader lines pointing to the tightest measurement points
+- In bump mode: a V-annotation at the belly nadir of the S2 car showing the computed breakover angle
 
-The results bar at the bottom shows a verdict (PASS / PASS-but-tight / FAIL) and per-check clearance with color coding.
+The results bar at the bottom shows a verdict (PASS / PASS-but-tight / FAIL) and per-check clearance with color coding. A derived specs bar above the results shows the computed breakover angle.
+
+Hovering any clearance check item, the breakover angle value, or a car on the canvas shows a floating tooltip explaining what that element represents.
 
 ## Presets
 
@@ -134,6 +138,7 @@ Four built-in configurations:
 - Pure vanilla HTML/CSS/JS — no frameworks, no build step, no dependencies.
 - Canvas bounding box tracks the road's left edge with a fixed 500 mm margin, then extends a fixed total width. This keeps the car rendered at the same scale regardless of obstacle type or car size.
 - Bump mode uses explicit span controls (`upperFlatStart`, `riseBase`, `lowerFlatLen`) to place the bump within a longer stretch of flat road without changing the fixed viewport logic.
+- The breakover angle is a derived output computed from wheelbase and ground clearance, not a user input.
 - Re-renders live on any input change.
 - The worst-case scenario is drawn solid; others are dashed ghosts for comparison.
 - Slope angle and grade percentage stay bidirectionally synced, independently for rise and fall.
