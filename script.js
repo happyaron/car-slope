@@ -8,25 +8,25 @@ const PRESETS = {
   ramp_15: {
     mode: 'ramp',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
-    approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
+    approachAngle: 15, departureAngle: 16, tireRadius: 340,
     rampGrade: 15,
   },
   ramp_20: {
     mode: 'ramp',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
-    approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
+    approachAngle: 15, departureAngle: 16, tireRadius: 340,
     rampGrade: 20,
   },
   bump_100: {
     mode: 'bump',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
-    approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
+    approachAngle: 15, departureAngle: 16, tireRadius: 340,
     rampGrade: 20, rampGradeFall: 20, bumpHeight: 100, bumpWidth: 1000,
   },
   bump_150: {
     mode: 'bump',
     wheelbase: 2875, clearance: 138, frontOverhang: 840, rearOverhang: 978,
-    approachAngle: 15, departureAngle: 16, breakoverAngle: 12, tireRadius: 340,
+    approachAngle: 15, departureAngle: 16, tireRadius: 340,
     rampGrade: 20, rampGradeFall: 20, bumpHeight: 150, bumpWidth: 1000,
   },
 };
@@ -86,7 +86,6 @@ function readInputs() {
     Or:  v('rearOverhang'),
     αa:  v('approachAngle'),
     αd:  v('departureAngle'),
-    αb:  v('breakoverAngle'),
     r:   v('tireRadius'),
     θ:   v('rampAngle'),
     mode,
@@ -117,22 +116,22 @@ function readInputs() {
 // Car underside points (front to rear):
 //   P0: front bumper bottom  — x = +Of, y = Of*tan(αa)
 //   P1: approach ramp meets belly — x = h/tan(αa), y = h
-//   P2: breakover nadir — x = -L/2, y = h - (L/2)*tan(αb/2)
-//         αb is the full included V-angle at the belly midpoint.
-//         The nadir sits below the flat belly by (L/2)*tan(αb/2).
-//         Clamped to 0 so it never goes below the road surface.
+//   P2: breakover nadir — x = -L/2, y = h  (belly is flat at ground clearance height)
 //   P3: departure ramp meets belly — x = -(L - h/tan(αd)), y = h
 //   P4: rear bumper bottom — x = -(L+Or), y = Or*tan(αd)
+//
+// Note: the breakover angle input is a capability spec (the steepest crest the
+// car can straddle), not a belly shape parameter. The belly geometry is fully
+// determined by h, L, αa, and αd — the breakover angle is an output, not an input.
 
 function buildCarProfile(c) {
-  const { L, h, Of, Or, αa, αd, αb } = c;
+  const { L, h, Of, Or, αa, αd } = c;
   const tanAa = Math.tan(deg2rad(αa));
   const tanAd = Math.tan(deg2rad(αd));
-  const nadirY = Math.max(0, h - (L / 2) * Math.tan(deg2rad(αb / 2)));
   return [
     [Of, Math.max(0, Of * tanAa)],
     [h / tanAa, h],
-    [-L / 2, nadirY],
+    [-L / 2, h],
     [-(L - h / tanAd), h],
     [-(L + Or), Math.max(0, Or * tanAd)],
   ];
@@ -508,6 +507,7 @@ function buildScenarios(c) {
 // ─── Canvas renderer ──────────────────────────────────────────────────────────
 const canvas = document.getElementById('scene');
 const ctx = canvas.getContext('2d');
+let lastRenderHits = null; // populated at end of render(), used by tooltip handler
 
 function render(c, results) {
   const W = parseFloat(canvas.style.width) || canvas.width;
@@ -987,6 +987,69 @@ function render(c, results) {
       ctx.restore();
     }
   }
+
+  // Breakover angle V-annotation on S2 — bump mode only.
+  // Two dashed lines from the belly nadir to each axle, arc + label at the nadir.
+  let lastBreakoverNadir = null;
+  if (bumpMode) {
+    const s2 = scenarios[1];
+    const nadir = s2.pts[2]; // P2 = belly nadir
+    const [nx, ny] = nadir;
+    const [fax, fay] = s2.fa;
+    const [rax, ray] = s2.ra;
+
+    const snx = tx(nx), sny = ty(ny);
+    const sfx = tx(fax), sfy = ty(fay);
+    const srx = tx(rax), sry = ty(ray);
+
+    const angF = Math.atan2(sfy - sny, sfx - snx);
+    const angR = Math.atan2(sry - sny, srx - snx);
+    const αbV = 2 * rad2deg(Math.atan2(2 * c.h, c.L));
+    const arcR = 28;
+
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = '#7b5ea7';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(snx, sny);
+    ctx.lineTo(sfx, sfy);
+    ctx.moveTo(snx, sny);
+    ctx.lineTo(srx, sry);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(snx, sny, arcR, angF, angR, false);
+    ctx.stroke();
+    const angMid = (angF + angR) / 2;
+    const labelR = arcR + 14;
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#5a3e8a';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${αbV.toFixed(1)}°`, snx + labelR * Math.cos(angMid), sny + labelR * Math.sin(angMid));
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+
+    lastBreakoverNadir = { sx: snx, sy: sny };
+  }
+
+  // Store hit-test data for canvas tooltip handler
+  lastRenderHits = {
+    scenarios: scenarios.map((s, i) => {
+      const xs = s.pts.map(p => tx(p[0]));
+      const ys = s.pts.map(p => ty(p[1]));
+      return {
+        x1: Math.min(...xs) - 20, y1: Math.min(...ys) - 20,
+        x2: Math.max(...xs) + 20, y2: Math.max(...ys) + 20,
+        index: i,
+      };
+    }),
+    breakoverNadir: lastBreakoverNadir,
+    mode: c.mode,
+  };
 }
 
 // ─── Results panel ────────────────────────────────────────────────────────────
@@ -1019,6 +1082,13 @@ function updateResults(results, c) {
   } else {
     v.className = 'verdict pass';
     v.textContent = `PASS — Car clears the ${obstacle}`;
+  }
+
+  // Derived specs: breakover angle computed from geometry (not an input)
+  // αb = 2 * arctan(2h / L) — the angle at the belly nadir between lines to each axle
+  if (c) {
+    const αb = 2 * rad2deg(Math.atan2(2 * c.h, c.L));
+    document.getElementById('derived-breakover').textContent = `${αb.toFixed(1)}°`;
   }
 }
 
@@ -1083,3 +1153,76 @@ function sizeCanvas() {
 sizeCanvas();
 syncModeUI();
 loadPreset('ramp_15');
+
+// ─── Tooltips ─────────────────────────────────────────────────────────────────
+const tooltipEl = document.getElementById('tooltip');
+
+function showTooltip(text, clientX, clientY) {
+  tooltipEl.textContent = text;
+  tooltipEl.style.display = 'block';
+  const tw = tooltipEl.offsetWidth, th = tooltipEl.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let x = clientX + 14, y = clientY + 14;
+  if (x + tw > vw - 8) x = clientX - tw - 14;
+  if (y + th > vh - 8) y = clientY - th - 14;
+  tooltipEl.style.left = x + 'px';
+  tooltipEl.style.top  = y + 'px';
+}
+
+function hideTooltip() {
+  tooltipEl.style.display = 'none';
+}
+
+// HTML element tooltips (results bar + derived specs)
+document.querySelectorAll('[data-tip]').forEach(el => {
+  el.addEventListener('mouseenter', e => showTooltip(el.dataset.tip, e.clientX, e.clientY));
+  el.addEventListener('mousemove',  e => showTooltip(el.dataset.tip, e.clientX, e.clientY));
+  el.addEventListener('mouseleave', hideTooltip);
+});
+
+// Canvas tooltips
+const scenarioTips = {
+  ramp: [
+    'Approach: front tires at the crest, car horizontal. Checks front bumper clearance above the ramp face.',
+    'Top breakover: rear tires at the crest, car tilted nose-down on the ramp. Checks belly clearance above the ramp.',
+    'Bottom breakover: front tires at the ramp bottom, rear tires still on the slope. Checks belly clearance at the lower transition.',
+    'Departure: rear tires at the ramp bottom, car horizontal on the lower flat. Checks rear bumper clearance.',
+  ],
+  bump: [
+    'Approach: front tires at the rise base, car horizontal. Checks front bumper clearance against the rising face.',
+    'Top breakover: rear tires at the rise base, front tires climbing the bump. Checks belly clearance above the bump top.',
+    'Bottom breakover: front tires past the fall, rear tires still on the bump. Checks belly clearance against the fall face.',
+    'Departure: rear tires at the fall base, car horizontal. Checks rear bumper clearance against the fall face.',
+  ],
+};
+const breakoverNadirTip = 'Breakover angle: the included angle at the belly\'s lowest point between lines to each axle. Computed as 2 × arctan(2h / L).';
+
+canvas.addEventListener('mousemove', e => {
+  if (!lastRenderHits) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  // Check breakover nadir first (smaller target, higher priority)
+  const bn = lastRenderHits.breakoverNadir;
+  if (bn) {
+    const dx = mx - bn.sx, dy = my - bn.sy;
+    if (dx * dx + dy * dy < 30 * 30) {
+      showTooltip(breakoverNadirTip, e.clientX, e.clientY);
+      return;
+    }
+  }
+
+  // Check scenario bounding boxes
+  const tips = scenarioTips[lastRenderHits.mode] || scenarioTips.ramp;
+  for (const s of lastRenderHits.scenarios) {
+    if (mx >= s.x1 && mx <= s.x2 && my >= s.y1 && my <= s.y2) {
+      showTooltip(tips[s.index], e.clientX, e.clientY);
+      return;
+    }
+  }
+
+  hideTooltip();
+});
+
+canvas.addEventListener('mouseleave', hideTooltip);

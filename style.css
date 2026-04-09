@@ -144,6 +144,19 @@ canvas {
   background: #fff;
 }
 
+#derived-specs {
+  background: #fff;
+  border-top: 1px solid #ddd;
+  padding: .4rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .78rem;
+  color: #555;
+}
+.derived-label { color: #888; }
+.derived-value { font-weight: 600; color: #333; }
+
 #results {
   background: #fff;
   border-top: 1px solid #ddd;
@@ -172,4 +185,21 @@ canvas {
 .check-item.ok   { background: #e8f5e9; color: #2e7d32; }
 .check-item.warn { background: #fff3e0; color: #e65100; }
 .check-item.bad  { background: #ffebee; color: #c62828; }
+
+.check-item[data-tip], #derived-breakover[data-tip] { cursor: help; }
+
+.tooltip {
+  display: none;
+  position: fixed;
+  max-width: 280px;
+  padding: .5rem .75rem;
+  background: #1a1a2e;
+  color: #eee;
+  font-size: .78rem;
+  line-height: 1.5;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  pointer-events: none;
+  z-index: 100;
+}
 
