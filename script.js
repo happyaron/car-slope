@@ -117,18 +117,22 @@ function readInputs() {
 // Car underside points (front to rear):
 //   P0: front bumper bottom  — x = +Of, y = Of*tan(αa)
 //   P1: approach ramp meets belly — x = h/tan(αa), y = h
-//   P2: breakover nadir — x = -L/2, y = h
+//   P2: breakover nadir — x = -L/2, y = h - (L/2)*tan(αb/2)
+//         αb is the full included V-angle at the belly midpoint.
+//         The nadir sits below the flat belly by (L/2)*tan(αb/2).
+//         Clamped to 0 so it never goes below the road surface.
 //   P3: departure ramp meets belly — x = -(L - h/tan(αd)), y = h
 //   P4: rear bumper bottom — x = -(L+Or), y = Or*tan(αd)
 
 function buildCarProfile(c) {
-  const { L, h, Of, Or, αa, αd } = c;
+  const { L, h, Of, Or, αa, αd, αb } = c;
   const tanAa = Math.tan(deg2rad(αa));
   const tanAd = Math.tan(deg2rad(αd));
+  const nadirY = Math.max(0, h - (L / 2) * Math.tan(deg2rad(αb / 2)));
   return [
     [Of, Math.max(0, Of * tanAa)],
     [h / tanAa, h],
-    [-L / 2, h],
+    [-L / 2, nadirY],
     [-(L - h / tanAd), h],
     [-(L + Or), Math.max(0, Or * tanAd)],
   ];
